@@ -1,8 +1,9 @@
+import { doInit } from 'actions/auth';
 import axios from 'axios';
 import Errors from 'components/FormItems/error/errors';
 import { push } from 'connected-react-router';
-import { doInit } from 'actions/auth';
 import { showSnackbar } from '../../components/Snackbar';
+import config from '../../config';
 
 const actions = {
   doNew: () => {
@@ -17,7 +18,7 @@ const actions = {
         type: 'USERS_FORM_FIND_STARTED',
       });
 
-      axios.get(`/users/${id}`).then((res) => {
+      axios.get(`${config.baseURLApi}/v1/users/${id}`).then((res) => {
         const record = res.data;
 
         dispatch({
@@ -42,7 +43,7 @@ const actions = {
         type: 'USERS_FORM_CREATE_STARTED',
       });
 
-      axios.post('/users', { data: values }).then((res) => {
+      axios.post(`${config.baseURLApi}/v1/users`, values).then((res) => {
         dispatch({
           type: 'USERS_FORM_CREATE_SUCCESS',
         });
@@ -64,7 +65,7 @@ const actions = {
         type: 'USERS_FORM_UPDATE_STARTED',
       });
 
-      await axios.put(`/users/${id}`, { id, data: values });
+      await axios.put(`${config.baseURLApi}/v1/users/${id}`, values);
 
       dispatch(doInit());
 

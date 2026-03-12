@@ -1,20 +1,19 @@
-import React from 'react';
 import {
+  AppBar as AppBarBase,
+  Avatar as AvatarBase,
   Badge as BadgeBase,
-  Typography as TypographyBase,
   Button as ButtonBase,
   Chip as ChipBase,
-  Tooltip as TooltipBase,
-  Avatar as AvatarBase,
-  Paper as PaperBase,
-  AppBar as AppBarBase,
-  Link as LinkBase,
   CircularProgress as CircularProgressBase,
   LinearProgress as LinearProgressBase,
+  Link as LinkBase,
+  Paper as PaperBase,
   Radio as RadioBase,
+  Tooltip as TooltipBase,
+  Typography as TypographyBase,
+  useTheme,
 } from '@mui/material';
-import { useTheme } from '@mui/material';
-import { withStyles, makeStyles } from '@mui/styles';
+import { makeStyles, withStyles } from '@mui/styles';
 import classnames from 'classnames';
 
 // styles
@@ -120,10 +119,12 @@ function Typography({
   );
 }
 
-function Button({ children, color, className, style, ...props }) {
+function Button({ children, color, className, style, variant, ...props }) {
   const useStyles = makeStyles((theme) => ({
     root: {
       color: getColor(color, theme),
+      textTransform: 'none',
+      fontWeight: 500,
     },
     contained: {
       backgroundColor: getColor(color, theme),
@@ -141,8 +142,11 @@ function Button({ children, color, className, style, ...props }) {
       },
     },
     outlined: {
-      color: getColor(color, theme),
-      borderColor: getColor(color, theme),
+      color: `${getColor(color, theme)} !important`,
+      borderColor: `${getColor(color, theme)} !important`,
+      '&:hover': {
+        backgroundColor: `${getColor(color, theme)}11`, // Subtle background on hover
+      }
     },
     select: {
       backgroundColor: theme.palette.primary.main,
@@ -154,14 +158,15 @@ function Button({ children, color, className, style, ...props }) {
   return (
     <ButtonBase
       classes={{
-        contained: classes.contained,
         root: classes.root,
-        outlined: classes.outlined,
       }}
       {...props}
       className={classnames(
+        classes.root,
         {
           [classes.select]: props.select,
+          [classes.contained]: variant === 'contained',
+          [classes.outlined]: variant === 'outlined',
         },
         className,
       )}
@@ -341,23 +346,17 @@ function Radio({ children, color, ...props }) {
 }
 
 export {
-  Badge,
-  Typography,
-  Button,
-  Chip,
-  Tooltip,
-  Avatar,
-  Paper,
-  AppBar,
-  Link,
-  CircularProgress,
-  LinearProgress,
-  Radio,
+  AppBar, Avatar, Badge, Button,
+  Chip, CircularProgress,
+  LinearProgress, Link, Paper, Radio, Tooltip, Typography
 };
 
 // ########################################################################
 
 function getColor(color, theme, brightness = 'main') {
+  if (color === 'inherit') {
+    return 'inherit';
+  }
   if (color && theme.palette[color] && theme.palette[color][brightness]) {
     return theme.palette[color][brightness];
   }

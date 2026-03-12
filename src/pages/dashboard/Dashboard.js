@@ -1,51 +1,46 @@
+import {
+  Box,
+  Checkbox,
+  Grid,
+  IconButton,
+  MenuItem,
+  OutlinedInput,
+  Select,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+  Toolbar
+} from "@mui/material";
+import { makeStyles, useTheme } from '@mui/styles';
 import React, { useState } from "react";
 import {
-  Grid,
-  LinearProgress,
-  Select,
-  OutlinedInput,
-  MenuItem,
-  Box,
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
-  Checkbox,
-  TablePagination,
-  TableHead,
-  TableSortLabel,
-  Toolbar,
-  IconButton, Menu
-} from "@mui/material";
-import { useTheme, makeStyles } from '@mui/styles';
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  AreaChart,
-  Line,
   Area,
-  PieChart,
-  Pie,
-  Cell,
-  YAxis,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
-  Tooltip
+  YAxis
 } from "recharts";
 
 // styles
 import useStyles from "./styles";
 
 // components
-import mock from "./mock";
-import Widget from "../../components/Widget";
-import { Chip, Typography, Avatar } from "../../components/Wrappers";
-import Dot from "../../components/Sidebar/components/Dot";
-import BigStat from "./components/BigStat/BigStat";
 import {
+  CheckCircle as CheckCircleIcon,
   Delete as DeleteIcon,
-  FilterList as FilterListIcon, MoreVert as MoreIcon,
+  FilterList as FilterListIcon,
+  FlashOn as FlashOnIcon,
+  School as SchoolIcon,
+  SmartToy as SmartToyIcon,
+  Visibility as VisibilityIcon
 } from "@mui/icons-material";
 import PropTypes from "prop-types";
+import Dot from "../../components/Sidebar/components/Dot";
+import Widget from "../../components/Widget";
+import { Typography } from "../../components/Wrappers";
 
 import { lighten } from '@mui/material/styles';
 import cn from "classnames";
@@ -179,8 +174,8 @@ function stableSort(array, cmp) {
 
 function getSorting(order, orderBy) {
   return order === "desc"
-      ? (a, b) => desc(a, b, orderBy)
-      : (a, b) => -desc(a, b, orderBy);
+    ? (a, b) => desc(a, b, orderBy)
+    : (a, b) => -desc(a, b, orderBy);
 }
 
 const headCells = [
@@ -225,44 +220,44 @@ function EnhancedTableHead(props) {
   };
 
   return (
-      <TableHead>
-        <TableRow>
-          <TableCell padding="checkbox">
-            <Checkbox
-                indeterminate={numSelected > 0 && numSelected < rowCount}
-                checked={numSelected === rowCount}
-                onChange={onSelectAllClick}
-                inputProps={{ "aria-label": "select all rows" }}
-            />
-          </TableCell>
-          {headCells.map(headCell => (
-              <TableCell
-                  key={headCell.id}
-                  align={headCell.numeric ? "left" : "right"}
-                  padding={headCell.disablePadding ? "none" : null}
-                  sortDirection={orderBy === headCell.id ? order : false}
-              >
-                <TableSortLabel
-                    active={orderBy === headCell.id}
-                    direction={order}
-                    onClick={createSortHandler(headCell.id)}
-                    style={{
-                      whiteSpace: "nowrap",
-                      textTransform: "uppercase",
-                      fontSize: "0.85rem",
-                    }}
-                >
-                  <Typography uppercase color="text" variant={"body2"} colorBrightness="hint">{headCell.label}</Typography>
-                  {orderBy === headCell.id ? (
-                      <span className={classes.visuallyHidden}>
+    <TableHead>
+      <TableRow>
+        <TableCell padding="checkbox">
+          <Checkbox
+            indeterminate={numSelected > 0 && numSelected < rowCount}
+            checked={numSelected === rowCount}
+            onChange={onSelectAllClick}
+            inputProps={{ "aria-label": "select all rows" }}
+          />
+        </TableCell>
+        {headCells.map(headCell => (
+          <TableCell
+            key={headCell.id}
+            align={headCell.numeric ? "left" : "right"}
+            padding={headCell.disablePadding ? "none" : null}
+            sortDirection={orderBy === headCell.id ? order : false}
+          >
+            <TableSortLabel
+              active={orderBy === headCell.id}
+              direction={order}
+              onClick={createSortHandler(headCell.id)}
+              style={{
+                whiteSpace: "nowrap",
+                textTransform: "uppercase",
+                fontSize: "0.85rem",
+              }}
+            >
+              <Typography uppercase color="text" variant={"body2"} colorBrightness="hint">{headCell.label}</Typography>
+              {orderBy === headCell.id ? (
+                <span className={classes.visuallyHidden}>
                   {order === "desc" ? "sorted descending" : "sorted ascending"}
                 </span>
-                  ) : null}
-                </TableSortLabel>
-              </TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
+              ) : null}
+            </TableSortLabel>
+          </TableCell>
+        ))}
+      </TableRow>
+    </TableHead>
   );
 }
 
@@ -278,15 +273,15 @@ EnhancedTableHead.propTypes = {
 
 const useToolbarStyles = makeStyles(theme => ({
   highlight:
-      theme.palette.type === "light"
-          ? {
-            color: theme.palette.secondary.main,
-            backgroundColor: lighten(theme.palette.secondary.light, 0.85)
-          }
-          : {
-            color: theme.palette.text.primary,
-            backgroundColor: theme.palette.secondary.dark
-          },
+    theme.palette.type === "light"
+      ? {
+        color: theme.palette.secondary.main,
+        backgroundColor: lighten(theme.palette.secondary.light, 0.85)
+      }
+      : {
+        color: theme.palette.text.primary,
+        backgroundColor: theme.palette.secondary.dark
+      },
   title: {
     flex: "1 1 100%"
   }
@@ -297,57 +292,57 @@ const EnhancedTableToolbar = props => {
   const { numSelected } = props;
 
   return (
-      <Toolbar
-        className={cn(classes.root, {
-          [classes.highlight]: numSelected > 0
-        })}
-      >
-        {numSelected > 0 ? (
+    <Toolbar
+      className={cn(classes.root, {
+        [classes.highlight]: numSelected > 0
+      })}
+    >
+      {numSelected > 0 ? (
+        <Typography
+          className={classes.title}
+          color="inherit"
+          variant="subtitle1"
+        >
+          {numSelected} selected
+        </Typography>
+      ) : (
+        <Box display={"flex"} className={classes.title}>
           <Typography
-            className={classes.title}
-            color="inherit"
-            variant="subtitle1"
+            variant="h6"
+            color="text"
+            colorBrightness={"secondary"}
+            id="tableTitle"
+            style={{ display: "flex" }}
+            block
           >
-            {numSelected} selected
-          </Typography>
-        ) : (
-            <Box display={"flex"} className={classes.title}>
+            Recent Orders
+            <Box display="flex" alignSelf={"flex-end"} ml={1}>
               <Typography
-                variant="h6"
                 color="text"
-                colorBrightness={"secondary"}
-                id="tableTitle"
-                style={{ display: "flex" }}
-                block
+                colorBrightness={"hint"}
+                variant={"caption"}
               >
-                Recent Orders
-                <Box display="flex" alignSelf={"flex-end"} ml={1}>
-                  <Typography
-                    color="text"
-                    colorBrightness={"hint"}
-                    variant={"caption"}
-                  >
-                    1.340 total
-                  </Typography>
-                </Box>
+                1.340 total
               </Typography>
             </Box>
-        )}
+          </Typography>
+        </Box>
+      )}
 
-        {numSelected > 0 ? (
-            <Tooltip title="Delete">
-              <IconButton aria-label="delete">
-                <DeleteIcon />
-              </IconButton>
-            </Tooltip>
-        ) : (
-            <Tooltip title="Filter list">
-              <IconButton aria-label="filter list">
-                <FilterListIcon />
-              </IconButton>
-            </Tooltip>
-        )}
-      </Toolbar>
+      {numSelected > 0 ? (
+        <Tooltip title="Delete">
+          <IconButton aria-label="delete">
+            <DeleteIcon />
+          </IconButton>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Filter list">
+          <IconButton aria-label="filter list">
+            <FilterListIcon />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Toolbar>
   );
 };
 
@@ -369,7 +364,7 @@ function Dashboard() {
   const [selected, setSelected] = React.useState([]);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [actionsButtonRefID, setActionsButtonRefID] =  React.useState(null);
+  const [actionsButtonRefID, setActionsButtonRefID] = React.useState(null);
   const [isActionsMenu, setActionsMenu] = React.useState(false)
 
 
@@ -400,8 +395,8 @@ function Dashboard() {
       newSelected = newSelected.concat(selected.slice(0, -1));
     } else if (selectedIndex > 0) {
       newSelected = newSelected.concat(
-          selected.slice(0, selectedIndex),
-          selected.slice(selectedIndex + 1)
+        selected.slice(0, selectedIndex),
+        selected.slice(selectedIndex + 1)
       );
     }
 
@@ -420,21 +415,19 @@ function Dashboard() {
   const isSelected = name => selected.indexOf(name) !== -1;
 
   const emptyRows =
-      rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage);
+    rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage);
 
   const randomData = React.useMemo(() => getRandomData(10), []);
 
   const mainChartData = React.useMemo(() => {
     let resultArray = [];
-    let tablet = getRandomData(31, 3500, 6500, 7500, 1000);
-    let desktop = getRandomData(31, 1500, 7500, 7500, 1500);
-    let mobile = getRandomData(31, 1500, 7500, 7500, 1500);
+    let submitted = getRandomData(31, 50, 95, 100, 15);
+    let evaluated = getRandomData(31, 15, 45, 100, 10);
 
-    for (let i = 0; i < tablet.length; i++) {
+    for (let i = 0; i < submitted.length; i++) {
       resultArray.push({
-        tablet: tablet[i].value,
-        desktop: desktop[i].value,
-        mobile: mobile[i].value
+        submitted: submitted[i].value,
+        evaluated: evaluated[i].value,
       });
     }
 
@@ -443,11 +436,71 @@ function Dashboard() {
 
   return (
     <Grid container spacing={3}>
-      <Grid item lg={3} sm={6} xs={12}>
+      {/* KPI Cards Mockup */}
+      <Grid item xs={12}>
+        <Grid container spacing={3}>
+          <Grid item lg={2.4} sm={6} xs={12}>
+            <Widget title="Входной поток" upperTitle className={classes.card}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h2" weight="medium">1 254</Typography>
+                  <Typography color="text" colorBrightness="hint" variant="caption">Всего заявок</Typography>
+                </Box>
+                <SchoolIcon style={{ fontSize: 40, color: theme.palette.primary.main, opacity: 0.5 }} />
+              </Box>
+            </Widget>
+          </Grid>
+          <Grid item lg={2.4} sm={6} xs={12}>
+            <Widget title="Результативность дня" upperTitle className={classes.card}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h2" weight="medium" color="success">+142</Typography>
+                  <Typography color="text" colorBrightness="hint" variant="caption">Обработано за сегодня</Typography>
+                </Box>
+                <FlashOnIcon style={{ fontSize: 40, color: theme.palette.success.main, opacity: 0.5 }} />
+              </Box>
+            </Widget>
+          </Grid>
+          <Grid item lg={2.4} sm={6} xs={12}>
+            <Widget title="ИИ система" upperTitle className={classes.card}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h2" weight="medium" color="secondary">45</Typography>
+                  <Typography color="text" colorBrightness="hint" variant="caption">В обработке ИИ</Typography>
+                </Box>
+                <SmartToyIcon style={{ fontSize: 40, color: theme.palette.secondary.main, opacity: 0.5 }} />
+              </Box>
+            </Widget>
+          </Grid>
+          <Grid item lg={2.4} sm={6} xs={12}>
+            <Widget title="Очередь операторов" upperTitle className={classes.card}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h2" weight="medium" color="warning">78</Typography>
+                  <Typography color="text" colorBrightness="hint" variant="caption">Ждут верификации</Typography>
+                </Box>
+                <VisibilityIcon style={{ fontSize: 40, color: theme.palette.warning.main, opacity: 0.5 }} />
+              </Box>
+            </Widget>
+          </Grid>
+          <Grid item lg={2.4} sm={6} xs={12}>
+            <Widget title="Финальный результат" upperTitle className={classes.card}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="h2" weight="medium" style={{ color: '#0070f3' }}>850</Typography>
+                  <Typography color="text" colorBrightness="hint" variant="caption">Оценено экспертами</Typography>
+                </Box>
+                <CheckCircleIcon style={{ fontSize: 40, color: '#0070f3', opacity: 0.5 }} />
+              </Box>
+            </Widget>
+          </Grid>
+        </Grid>
+      </Grid>
+      {/* <Grid item lg={3} sm={6} xs={12}>
         <Widget
-            title="Support Tracker"
-            bodyClass={classes.fullHeightBody}
-            className={classes.card}
+          title="Тикеты поддержки"
+          bodyClass={classes.fullHeightBody}
+          className={classes.card}
         >
           <Grid container spacing={3} alignItems="center">
             <Grid item xs={6}>
@@ -457,49 +510,49 @@ function Dashboard() {
                 </Typography>
 
                 <Typography
-                    color="text"
-                    variant={"caption"}
-                    noWrap
-                    style={{ alignSelf: "flex-end", marginLeft: 8 }}
+                  color="text"
+                  variant={"caption"}
+                  noWrap
+                  style={{ alignSelf: "flex-end", marginLeft: 8 }}
                 >
-                  Tickets
+                  Тикеты
                 </Typography>
               </Box>
             </Grid>
             <Grid
-                item
-                xs={6}
-                style={{
-                  justifyContent: "center",
-                  alignItems: "center",
-                  display: "flex"
-                }}
+              item
+              xs={6}
+              style={{
+                justifyContent: "center",
+                alignItems: "center",
+                display: "flex"
+              }}
             >
               <Typography
-                  variant="caption"
-                  weight={"medium"}
-                  style={{ position: "absolute" }}
+                variant="caption"
+                weight={"medium"}
+                style={{ position: "absolute" }}
               >
                 64%
               </Typography>
               <ResponsiveContainer width="100%" height={80}>
                 <PieChart>
                   <Pie
-                      data={TicketChartData}
-                      startAngle={270}
-                      endAngle={0}
-                      paddingAngle={5}
-                      innerRadius={30}
-                      outerRadius={35}
-                      dataKey="value"
-                      style={{ border: 0 }}
+                    data={TicketChartData}
+                    startAngle={270}
+                    endAngle={0}
+                    paddingAngle={5}
+                    innerRadius={30}
+                    outerRadius={35}
+                    dataKey="value"
+                    style={{ border: 0 }}
                   >
                     {TicketChartData.map((entry, index) => (
-                        <Cell
-                            key={`cell-${index}`}
-                            fill={theme.palette[entry.color].main}
-                            stroke={""}
-                        />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={theme.palette[entry.color].main}
+                        stroke={""}
+                      />
                     ))}
                   </Pie>
                 </PieChart>
@@ -507,27 +560,27 @@ function Dashboard() {
             </Grid>
           </Grid>
           <Grid
-              container
-              direction="row"
-              justify="space-between"
-              alignItems="center"
-              wrap={"nowrap"}
+            container
+            direction="row"
+            justify="space-between"
+            alignItems="center"
+            wrap={"nowrap"}
           >
             <Grid item>
               <Typography
-                  color="text"
-                  colorBrightness={"hint"}
-                  variant={"caption"}
-                  style={{ marginRight: 5 }}
-                  noWrap
+                color="text"
+                colorBrightness={"hint"}
+                variant={"caption"}
+                style={{ marginRight: 5 }}
+                noWrap
               >
-                New Tickets
+                Новые
               </Typography>
               <Box display="flex" alignItems="center" justifyContent={"center"}>
                 <Typography
-                    size="md"
-                    weight={"medium"}
-                    style={{ marginRight: 8 }}
+                  size="md"
+                  weight={"medium"}
+                  style={{ marginRight: 8 }}
                 >
                   45
                 </Typography>
@@ -536,18 +589,18 @@ function Dashboard() {
             </Grid>
             <Grid item>
               <Typography
-                  color="text"
-                  colorBrightness={"hint"}
-                  variant={"caption"}
-                  style={{ marginRight: 5 }}
+                color="text"
+                colorBrightness={"hint"}
+                variant={"caption"}
+                style={{ marginRight: 5 }}
               >
-                Open
+                Открытые
               </Typography>
               <Box display="flex" alignItems="center" justifyContent={"center"}>
                 <Typography
-                    size="md"
-                    weight={"medium"}
-                    style={{ marginRight: 8 }}
+                  size="md"
+                  weight={"medium"}
+                  style={{ marginRight: 8 }}
                 >
                   147
                 </Typography>
@@ -556,17 +609,17 @@ function Dashboard() {
             </Grid>
             <Grid item>
               <Typography
-                  color="text"
-                  colorBrightness={"hint"}
-                  variant={"caption"}
+                color="text"
+                colorBrightness={"hint"}
+                variant={"caption"}
               >
-                Completed
+                Завершено
               </Typography>
               <Box display="flex" alignItems="center" justifyContent={"center"}>
                 <Typography
-                    size="md"
-                    weight={"medium"}
-                    style={{ marginRight: 8 }}
+                  size="md"
+                  weight={"medium"}
+                  style={{ marginRight: 8 }}
                 >
                   351
                 </Typography>
@@ -578,42 +631,42 @@ function Dashboard() {
       </Grid>
       <Grid item lg={3} sm={6} xs={12}>
         <Widget
-            title="Revenue Breakdown"
-            className={classes.card}
-            bodyClass={classes.alignStandaloneElement}
+          title="Разделение доходов"
+          className={classes.card}
+          bodyClass={classes.alignStandaloneElement}
         >
           <Grid container spacing={3}>
             <Grid
-                item
-                xs={6}
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  padding: 6
-                }}
+              item
+              xs={6}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                padding: 6
+              }}
             >
               <Typography
-                  variant={"caption"}
-                  weight={"medium"}
-                  style={{ position: "absolute" }}
+                variant={"caption"}
+                weight={"medium"}
+                style={{ position: "absolute" }}
               >
                 1700
               </Typography>
               <ResponsiveContainer width="100%" height={144}>
                 <PieChart>
                   <Pie
-                      data={PieChartData}
-                      innerRadius={30}
-                      outerRadius={40}
-                      dataKey="value"
+                    data={PieChartData}
+                    innerRadius={30}
+                    outerRadius={40}
+                    dataKey="value"
                   >
                     {PieChartData.map((entry, index) => (
-                        <Cell
-                            key={`cell-${index}`}
-                            fill={theme.palette[entry.color].main}
-                            stroke={""}
-                        />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={theme.palette[entry.color].main}
+                        stroke={""}
+                      />
                     ))}
                   </Pie>
                 </PieChart>
@@ -622,20 +675,20 @@ function Dashboard() {
             <Grid item xs={6}>
               <div className={classes.pieChartLegendWrapper}>
                 {PieChartData.map(({ name, value, color }, index) => (
-                    <div key={color} className={classes.legendItemContainer}>
-                      <Dot color={color} style={{ marginRight: 5 }} />
-                      <Typography
-                          color="text"
-                          colorBrightness={"hint"}
-                          variant={"caption"}
-                          noWrap
-                      >
-                        &nbsp;{name}&nbsp;
-                      </Typography>
-                      <Typography color="text" weight={"medium"}>
-                        &nbsp;{value}
-                      </Typography>
-                    </div>
+                  <div key={color} className={classes.legendItemContainer}>
+                    <Dot color={color} style={{ marginRight: 5 }} />
+                    <Typography
+                      color="text"
+                      colorBrightness={"hint"}
+                      variant={"caption"}
+                      noWrap
+                    >
+                      &nbsp;{name}&nbsp;
+                    </Typography>
+                    <Typography color="text" weight={"medium"}>
+                      &nbsp;{value}
+                    </Typography>
+                  </div>
                 ))}
               </div>
             </Grid>
@@ -644,29 +697,29 @@ function Dashboard() {
       </Grid>
       <Grid item lg={3} sm={6} xs={12}>
         <Widget
-            title="App Performance"
-            className={classes.card}
-            bodyClass={classes.fullHeightBody}
+          title="Производительность"
+          className={classes.card}
+          bodyClass={classes.fullHeightBody}
         >
           <div className={classes.performanceLegendWrapper}>
             <div className={classes.legendElement}>
               <Dot color="warning" />
               <Typography
-                  color="text"
-                  colorBrightness="hint"
-                  variant={"body2"}
-                  className={classes.legendElementText}
+                color="text"
+                colorBrightness="hint"
+                variant={"body2"}
+                className={classes.legendElementText}
               >
-                Integration
+                Интеграция
               </Typography>
             </div>
             <div className={classes.legendElement}>
               <Dot color="primary" />
               <Typography
-                  color="text"
-                  colorBrightness="hint"
-                  variant={"body2"}
-                  className={classes.legendElementText}
+                color="text"
+                colorBrightness="hint"
+                variant={"body2"}
+                className={classes.legendElementText}
               >
                 SDK
               </Typography>
@@ -674,11 +727,11 @@ function Dashboard() {
           </div>
           <div className={classes.progressSection}>
             <Typography
-                color="text"
-                variant={"body2"}
-                className={classes.progressSectionTitle}
+              color="text"
+              variant={"body2"}
+              className={classes.progressSectionTitle}
             >
-              Integration
+              Интеграция
             </Typography>
             <LinearProgress
               variant="determinate"
@@ -706,17 +759,17 @@ function Dashboard() {
       </Grid>
       <Grid item lg={3} sm={6} xs={12}>
         <Widget
-            title="Server Overview"
-            className={classes.card}
-            bodyClass={classes.fullHeightBody}
+          title="Обзор сервера"
+          className={classes.card}
+          bodyClass={classes.fullHeightBody}
         >
           <div className={classes.serverOverviewElement}>
             <Typography
-                color="text"
-                noWrap
-                variant={"body2"}
-                weight={"medium"}
-                className={classes.serverOverviewElementText}
+              color="text"
+              noWrap
+              variant={"body2"}
+              weight={"medium"}
+              className={classes.serverOverviewElementText}
             >
               60% / 37°С / 3.3 Ghz
             </Typography>
@@ -724,12 +777,12 @@ function Dashboard() {
               <ResponsiveContainer height={50} width="99%">
                 <AreaChart data={randomData}>
                   <Area
-                      type="natural"
-                      dataKey="value"
-                      stroke={theme.palette.secondary.main}
-                      fill={theme.palette.secondary.light}
-                      strokeWidth={2}
-                      fillOpacity="0.25"
+                    type="natural"
+                    dataKey="value"
+                    stroke={theme.palette.secondary.main}
+                    fill={theme.palette.secondary.light}
+                    strokeWidth={2}
+                    fillOpacity="0.25"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -737,11 +790,11 @@ function Dashboard() {
           </div>
           <div className={classes.serverOverviewElement}>
             <Typography
-                color="text"
-                noWrap
-                weight={"medium"}
-                variant={"body2"}
-                className={classes.serverOverviewElementText}
+              color="text"
+              noWrap
+              weight={"medium"}
+              variant={"body2"}
+              className={classes.serverOverviewElementText}
             >
               54% / 31°С / 3.3 Ghz
             </Typography>
@@ -749,12 +802,12 @@ function Dashboard() {
               <ResponsiveContainer height={50} width="99%">
                 <AreaChart data={randomData}>
                   <Area
-                      type="natural"
-                      dataKey="value"
-                      stroke={theme.palette.primary.main}
-                      fill={theme.palette.primary.light}
-                      strokeWidth={2}
-                      fillOpacity="0.25"
+                    type="natural"
+                    dataKey="value"
+                    stroke={theme.palette.primary.main}
+                    fill={theme.palette.primary.light}
+                    strokeWidth={2}
+                    fillOpacity="0.25"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -762,11 +815,11 @@ function Dashboard() {
           </div>
           <div className={classes.serverOverviewElement}>
             <Typography
-                color="text"
-                noWrap
-                weight={"medium"}
-                variant={"body2"}
-                className={classes.serverOverviewElementText}
+              color="text"
+              noWrap
+              weight={"medium"}
+              variant={"body2"}
+              className={classes.serverOverviewElementText}
             >
               57% / 21°С / 3.3 Ghz
             </Typography>
@@ -774,152 +827,154 @@ function Dashboard() {
               <ResponsiveContainer height={50} width="99%">
                 <AreaChart data={randomData}>
                   <Area
-                      type="natural"
-                      dataKey="value"
-                      stroke={theme.palette.warning.main}
-                      fill={theme.palette.warning.light}
-                      strokeWidth={2}
-                      fillOpacity="0.25"
+                    type="natural"
+                    dataKey="value"
+                    stroke={theme.palette.warning.main}
+                    fill={theme.palette.warning.light}
+                    strokeWidth={2}
+                    fillOpacity="0.25"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         </Widget>
-      </Grid>
+      </Grid> */}
       <Grid item xs={12}>
         <Widget
-            bodyClass={classes.mainChartBody}
-            header={
-              <div className={classes.mainChartHeader}>
-                <Typography
-                  variant="h6"
-                  color="text"
-                  weight={"medium"}
-                  colorBrightness="secondary"
-                >
-                  Daily Line Chart
-                </Typography>
-                <div className={classes.mainChartHeaderLabels}>
-                  <div className={classes.mainChartHeaderLabel}>
-                    <Dot color="warning" />
-                    <Typography className={classes.mainChartLegendElement}>
-                      Tablet
-                    </Typography>
-                  </div>
-                  <div className={classes.mainChartHeaderLabel}>
-                    <Dot color="primary" />
-                    <Typography className={classes.mainChartLegendElement}>
-                      Mobile
-                    </Typography>
-                  </div>
-                  <div className={classes.mainChartHeaderLabel}>
-                    <Dot color="secondary" />
-                    <Typography className={classes.mainChartLegendElement}>
-                      Desktop
-                    </Typography>
-                  </div>
+          bodyClass={classes.mainChartBody}
+          header={
+            <div className={classes.mainChartHeader}>
+              <Typography
+                variant="h6"
+                color="text"
+                weight={"medium"}
+                colorBrightness="secondary"
+              >
+                Динамика обработки (Ежедневная)
+              </Typography>
+              <div className={classes.mainChartHeaderLabels}>
+                <div className={classes.mainChartHeaderLabel}>
+                  <Dot color="warning" />
+                  <Typography className={classes.mainChartLegendElement}>
+                    Подано заявок
+                  </Typography>
                 </div>
-                <Select
-                    value={mainChartState}
-                    onChange={e => setMainChartState(e.target.value)}
-                    input={
-                      <OutlinedInput
-                          classes={{
-                            notchedOutline: classes.mainChartSelectRoot,
-                            input: classes.mainChartSelect
-                          }}
-                      />
-                    }
-                    autoWidth
-                    className={classes.fixIconRight}
-                >
-                  <MenuItem value="daily">Daily</MenuItem>
-                  <MenuItem value="weekly">Weekly</MenuItem>
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                </Select>
+                <div className={classes.mainChartHeaderLabel}>
+                  <Dot color="primary" />
+                  <Typography className={classes.mainChartLegendElement}>
+                    Оценено
+                  </Typography>
+                </div>
+                {/* <div className={classes.mainChartHeaderLabel}>
+                  <Dot color="secondary" />
+                  <Typography className={classes.mainChartLegendElement}>
+                    Работа ИИ
+                  </Typography>
+                </div> */}
               </div>
-            }
+              <Select
+                value={mainChartState}
+                onChange={e => setMainChartState(e.target.value)}
+                input={
+                  <OutlinedInput
+                    classes={{
+                      notchedOutline: classes.mainChartSelectRoot,
+                      input: classes.mainChartSelect
+                    }}
+                  />
+                }
+                autoWidth
+                className={classes.fixIconRight}
+              >
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+              </Select>
+            </div>
+          }
         >
           <ResponsiveContainer width="100%" minWidth={500} height={350}>
             <ComposedChart
-                margin={{ top: 0, right: -15, left: -15, bottom: 0 }}
-                data={mainChartData}
+              margin={{ top: 0, right: -15, left: -15, bottom: 0 }}
+              data={mainChartData}
             >
               <YAxis
-                  ticks={[0, 2500, 5000, 7500]}
-                  tick={{
-                    fill: theme.palette.text.hint + "80",
-                    fontSize: 14
-                  }}
-                  stroke={theme.palette.text.hint + "80"}
-                  tickLine={false}
+                ticks={[0, 25, 50, 75, 100]}
+                tick={{
+                  fill: theme.palette.text.hint + "80",
+                  fontSize: 14
+                }}
+                stroke={theme.palette.text.hint + "80"}
+                tickLine={false}
               />
               <XAxis
-                  tickFormatter={i => i + 1}
-                  tick={{
-                    fill: theme.palette.text.hint + "80",
-                    fontSize: 14
-                  }}
-                  stroke={theme.palette.text.hint + "80"}
-                  tickLine={false}
+                tickFormatter={i => i + 1}
+                tick={{
+                  fill: theme.palette.text.hint + "80",
+                  fontSize: 14
+                }}
+                stroke={theme.palette.text.hint + "80"}
+                tickLine={false}
               />
               <Tooltip />
               <Area
-                  type="natural"
-                  dataKey="desktop"
-                  fill={theme.palette.background.light}
-                  strokeWidth={0}
-                  activeDot={false}
+                type="natural"
+                dataKey="submitted"
+                fill={theme.palette.background.light}
+                strokeWidth={0}
+                activeDot={false}
               />
               <Line
-                  type="natural"
-                  dataKey="mobile"
-                  stroke={theme.palette.primary.main}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={false}
+                type="linear"
+                dataKey="evaluated"
+                stroke={theme.palette.primary.main}
+                strokeWidth={2}
+                dot={{
+                  stroke: theme.palette.primary.dark,
+                  strokeWidth: 2,
+                  fill: theme.palette.primary.main
+                }}
+                activeDot={{
+                  r: 6
+                }}
               />
               <Line
-                  type="linear"
-                  dataKey="tablet"
-                  stroke={theme.palette.warning.main}
-                  strokeWidth={2}
-                  dot={{
-                    stroke: theme.palette.warning.dark,
-                    strokeWidth: 2,
-                    fill: theme.palette.warning.main
-                  }}
-                  activeDot={{
-                    r: 8
-                  }}
+                type="linear"
+                dataKey="submitted"
+                stroke={theme.palette.warning.main}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{
+                  r: 8
+                }}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </Widget>
       </Grid>
-      {mock.bigStat.map(stat => (
-          <Grid item md={4} sm={6} xs={12} key={stat.product}>
-            <BigStat {...stat} />
-          </Grid>
+      {/* {mock.bigStat.map(stat => (
+        <Grid item md={4} sm={6} xs={12} key={stat.product}>
+          <BigStat {...stat} />
+        </Grid>
       ))}
       <Grid item xs={12}>
         <Widget noBodyPadding bodyClass={classes.tableWidget}>
           <EnhancedTableToolbar numSelected={selected.length} />
           <div className={classes.tableWrapper}>
             <Table
-                className={classes.table}
-                aria-labelledby="tableTitle"
-                aria-label="recent orders"
+              className={classes.table}
+              aria-labelledby="tableTitle"
+              aria-label="recent orders"
             >
               <EnhancedTableHead
-                  classes={classes}
-                  numSelected={selected.length}
-                  order={order}
-                  orderBy={orderBy}
-                  onSelectAllClick={handleSelectAllClick}
-                  onRequestSort={handleRequestSort}
-                  rowCount={rows.length}
+                classes={classes}
+                numSelected={selected.length}
+                order={order}
+                orderBy={orderBy}
+                onSelectAllClick={handleSelectAllClick}
+                onRequestSort={handleRequestSort}
+                rowCount={rows.length}
               />
               <TableBody>
                 {stableSort(rows, getSorting(order, orderBy))
@@ -940,28 +995,28 @@ function Dashboard() {
                       >
                         <TableCell padding="checkbox">
                           <Checkbox
-                              checked={isItemSelected}
-                              inputProps={{ "aria-labelledby": labelId }}
+                            checked={isItemSelected}
+                            inputProps={{ "aria-labelledby": labelId }}
                           />
                         </TableCell>
                         <TableCell
-                            component="th"
-                            id={labelId}
-                            scope="row"
-                            padding="none"
+                          component="th"
+                          id={labelId}
+                          scope="row"
+                          padding="none"
                         >
                           {row.orderId}
                         </TableCell>
                         <TableCell>
                           <Box
-                              display={"flex"}
-                              flexWrap={"nowrap"}
-                              alignItems={"center"}
+                            display={"flex"}
+                            flexWrap={"nowrap"}
+                            alignItems={"center"}
                           >
                             <Avatar
-                                alt={row.customer}
-                                color={row.color}
-                                style={{ marginRight: 8 }}
+                              alt={row.customer}
+                              color={row.color}
+                              style={{ marginRight: 8 }}
                             >
                               {row.customer[0]}
                             </Avatar>
@@ -980,15 +1035,15 @@ function Dashboard() {
                         </TableCell>
                         <TableCell align={"center"}>
                           <IconButton
-                              className={classes.actionsIcon}
-                              aria-owns="actions-menu"
-                              aria-haspopup="true"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActionsMenu(true);
-                                setActionsButtonRefID(e.currentTarget)
-                              }}
-                              ref={setActionsButtonRefID}
+                            className={classes.actionsIcon}
+                            aria-owns="actions-menu"
+                            aria-haspopup="true"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActionsMenu(true);
+                              setActionsButtonRefID(e.currentTarget)
+                            }}
+                            ref={setActionsButtonRefID}
                           >
                             <MoreIcon />
                           </IconButton>
@@ -1014,8 +1069,8 @@ function Dashboard() {
                   })}
                 {emptyRows > 0 && (
                   <TableRow style={{ height: 53 * emptyRows }}>
-                      <TableCell colSpan={6} />
-                    </TableRow>
+                    <TableCell colSpan={6} />
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -1036,7 +1091,7 @@ function Dashboard() {
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
         </Widget>
-      </Grid>
+      </Grid> */}
     </Grid>
   );
 }
@@ -1051,10 +1106,10 @@ function getRandomData(length, min, max, multiplier = 10, maxDiff = 10) {
     let randomValue = Math.floor(Math.random() * multiplier + 1);
 
     while (
-        randomValue <= min ||
-        randomValue >= max ||
-        (lastValue && randomValue - lastValue > maxDiff)
-        ) {
+      randomValue <= min ||
+      randomValue >= max ||
+      (lastValue && randomValue - lastValue > maxDiff)
+    ) {
       randomValue = Math.floor(Math.random() * multiplier + 1);
     }
 

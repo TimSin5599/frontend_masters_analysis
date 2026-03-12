@@ -1,19 +1,18 @@
-import { Formik } from 'formik';
-import React from 'react';
-import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
 import Loader from 'components/Loader';
+import { Formik } from 'formik';
+import { useEffect, useState } from 'react';
 
-import InputFormItem from 'components/FormItems/items/InputFormItem';
-import SwitchFormItem from 'components/FormItems/items/SwitchFormItem';
-import RadioFormItem from 'components/FormItems/items/RadioFormItem';
 import ImagesFormItem from 'components/FormItems/items/ImagesFormItem';
+import InputFormItem from 'components/FormItems/items/InputFormItem';
+import RadioFormItem from 'components/FormItems/items/RadioFormItem';
 
-import usersFields from 'pages/CRUD/Users/helpers/usersFields';
+import FormValidations from 'components/FormItems/formValidations';
 import IniValues from 'components/FormItems/iniValues';
 import PreparedValues from 'components/FormItems/preparedValues';
-import FormValidations from 'components/FormItems/formValidations';
 import Widget from 'components/Widget';
+import usersFields from 'pages/CRUD/Users/helpers/usersFields';
 
 const UsersForm = (props) => {
   const {
@@ -25,8 +24,27 @@ const UsersForm = (props) => {
     onCancel,
   } = props;
 
+  const [isReadOnly, setIsReadOnly] = useState(isEditing || isProfile);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+
+  useEffect(() => {
+    if (!isEditing && !isProfile) {
+      // Generate a random 10-character password for new users
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+      let pass = '';
+      for (let i = 0; i < 10; i++) {
+        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      setGeneratedPassword(pass);
+    }
+  }, [isEditing, isProfile]);
+
   const iniValues = () => {
-    return IniValues(usersFields, record || {});
+    const values = IniValues(usersFields, record || {});
+    if (!isEditing && !isProfile && generatedPassword) {
+      values.password = generatedPassword;
+    }
+    return values;
   };
 
   const formValidations = () => {
@@ -61,27 +79,28 @@ const UsersForm = (props) => {
                   name={'firstName'}
                   schema={usersFields}
                   autoFocus
+                  disabled={isReadOnly}
                 />
               </Grid>
 
               <Grid item>
-                <InputFormItem name={'lastName'} schema={usersFields} />
+                <InputFormItem name={'lastName'} schema={usersFields} disabled={isReadOnly} />
               </Grid>
 
               <Grid item>
-                <InputFormItem name={'phoneNumber'} schema={usersFields} />
+                <InputFormItem name={'phoneNumber'} schema={usersFields} disabled={isReadOnly} />
               </Grid>
 
               <Grid item>
-                <InputFormItem name={'email'} schema={usersFields} />
+                <InputFormItem name={'email'} schema={usersFields} disabled={isReadOnly} />
               </Grid>
 
               <Grid item>
-                <RadioFormItem name={'role'} schema={usersFields} />
+                <InputFormItem name={'password'} schema={usersFields} disabled={isReadOnly} type="text" />
               </Grid>
 
               <Grid item>
-                <SwitchFormItem name={'disabled'} schema={usersFields} />
+                <RadioFormItem name={'role'} schema={usersFields} disabled={isReadOnly} />
               </Grid>
 
               <Grid item>
@@ -94,32 +113,45 @@ const UsersForm = (props) => {
                     formats: undefined,
                   }}
                   max={undefined}
+                  disabled={isReadOnly}
                 />
               </Grid>
 
-              <Grid item>
-                <InputFormItem name={'password'} schema={usersFields} />
-              </Grid>
+
             </Grid>
             <Grid container spacing={3} mt={2}>
-              <Grid item>
-                <Button
-                  color='primary'
-                  variant='contained'
-                  onClick={form.handleSubmit}
-                >
-                  Save
-                </Button>
-              </Grid>
-              <Grid item>
-                <Button
-                  color='primary'
-                  variant='outlined'
-                  onClick={form.handleReset}
-                >
-                  Reset
-                </Button>
-              </Grid>
+              {isReadOnly ? (
+                <Grid item>
+                  <Button
+                    color='primary'
+                    variant='contained'
+                    onClick={() => setIsReadOnly(false)}
+                  >
+                    Изменить
+                  </Button>
+                </Grid>
+              ) : (
+                <>
+                  <Grid item>
+                    <Button
+                      color='primary'
+                      variant='contained'
+                      onClick={form.handleSubmit}
+                    >
+                      Save
+                    </Button>
+                  </Grid>
+                  <Grid item>
+                    <Button
+                      color='primary'
+                      variant='outlined'
+                      onClick={form.handleReset}
+                    >
+                      Reset
+                    </Button>
+                  </Grid>
+                </>
+              )}
               <Grid item>
                 <Button
                   color='primary'

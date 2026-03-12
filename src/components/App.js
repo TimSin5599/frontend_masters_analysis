@@ -31,7 +31,7 @@ export default function App() {
               <Route
                 exact
                 path='/'
-                render={() => <Redirect to='/app/profile' />}
+                render={() => <Redirect to='/app/programs/current' />}
               />
 
               <Route

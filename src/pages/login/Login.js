@@ -1,35 +1,35 @@
-import React, { useState, useEffect } from 'react';
 import {
-  Grid,
   CircularProgress,
-  Tabs,
-  Tab,
+  Grid,
   Grow,
   TextField as Input,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material';
+import React, { useEffect, useState } from 'react';
 import { withRouter } from 'react-router-dom';
-import classnames from 'classnames';
 
 // styles
 import useStyles from './styles';
 
 // logo
 import logo from './logo.svg';
-import google from '../../images/google.svg';
+
 
 // context
 import {
-  useUserDispatch,
+  doInit,
   loginUser,
+  receiveToken,
   registerUser,
   sendPasswordResetEmail,
+  useUserDispatch,
 } from '../../context/UserContext';
-import { receiveToken, doInit } from '../../context/UserContext';
 
 //components
-import { Button } from '../../components/Wrappers';
 import Widget from '../../components/Widget';
+import { Button } from '../../components/Wrappers';
 import config from '../../config';
 
 const getGreeting = () => {
@@ -93,7 +93,7 @@ function Login(props) {
       <div className={classes.logotypeContainer}>
         <img src={logo} alt='logo' className={classes.logotypeImage} />
         <Typography className={classes.logotypeText}>
-          React Material Admin Full
+          Intellectual Portfolio Analysis
         </Typography>
       </div>
       <div
@@ -155,7 +155,6 @@ function Login(props) {
                 centered
               >
                 <Tab label='Login' classes={{ root: classes.tab }} />
-                <Tab label='New User' classes={{ root: classes.tab }} />
               </Tabs>
               {activeTabId === 0 && (
                 <React.Fragment>
@@ -181,35 +180,6 @@ function Login(props) {
                   <Typography variant='h1' className={classes.greeting}>
                     {getGreeting()}, User
                   </Typography>
-                  <Button
-                    size='large'
-                    className={classes.googleButton}
-                    onClick={() =>
-                      loginUser(
-                        userDispatch,
-                        loginValue,
-                        passwordValue,
-                        props.history,
-                        setIsLoading,
-                        setError,
-                        'google',
-                      )
-                    }
-                  >
-                    <img
-                      src={google}
-                      alt='google'
-                      className={classes.googleIcon}
-                    />
-                    &nbsp;Sign in with Google
-                  </Button>
-                  <div className={classes.formDividerContainer}>
-                    <div className={classes.formDivider} />
-                    <Typography className={classes.formDividerWord}>
-                      or
-                    </Typography>
-                    <div className={classes.formDivider} />
-                  </div>
                   <Grow
                     in={error}
                     style={
@@ -377,38 +347,7 @@ function Login(props) {
                       </Button>
                     )}
                   </div>
-                  <div className={classes.formDividerContainer}>
-                    <div className={classes.formDivider} />
-                    <Typography className={classes.formDividerWord}>
-                      or
-                    </Typography>
-                    <div className={classes.formDivider} />
-                  </div>
-                  <Button
-                    size='large'
-                    className={classnames(
-                      classes.googleButton,
-                      classes.googleButtonCreating,
-                    )}
-                    onClick={() =>
-                      loginUser(
-                        userDispatch,
-                        loginValue,
-                        passwordValue,
-                        props.history,
-                        setIsLoading,
-                        setError,
-                        'google',
-                      )
-                    }
-                  >
-                    <img
-                      src={google}
-                      alt='google'
-                      className={classes.googleIcon}
-                    />
-                    &nbsp;Sign in with Google
-                  </Button>
+
                 </React.Fragment>
               )}
             </>
@@ -427,7 +366,7 @@ function Login(props) {
           , LLC. All rights reserved.
         </Typography>
       </div>
-    </Grid>
+    </Grid >
   );
 }
 

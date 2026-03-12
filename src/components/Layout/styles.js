@@ -14,13 +14,6 @@ export default makeStyles((theme) => ({
     minHeight: '100vh',
     paddingBottom: 70,
   },
-  contentShift: {
-    width: `calc(100vw - (240px + ${theme.spacing(8)}))`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  },
   fakeToolbar: {
     ...theme.mixins.toolbar,
     marginTop: 25,

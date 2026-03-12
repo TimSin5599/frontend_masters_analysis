@@ -1,30 +1,30 @@
-import React, { useState } from 'react';
+import {
+  ExpandMore as ExpandIcon,
+  Inbox as InboxIcon,
+} from '@mui/icons-material';
 import {
   Box,
   Collapse,
   Divider,
+  TextField as Input,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
   Popover,
-  TextField as Input,
   Typography,
 } from '@mui/material';
-import {
-  Inbox as InboxIcon,
-  ExpandMore as ExpandIcon,
-} from '@mui/icons-material';
-import { Link } from 'react-router-dom';
 import classnames from 'classnames';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 // styles
-import useStyles from './styles';
 import useStyles2 from '../../styles';
+import useStyles from './styles';
 
 // components
+import { Badge, Button, Link as LinkMaterial } from '../../../Wrappers';
 import Dot from '../Dot';
-import {Button, Badge, Link as LinkMaterial} from '../../../Wrappers';
 
 export default function SidebarLink({
   link,
@@ -113,9 +113,9 @@ export default function SidebarLink({
             className={classnames(classes.linkIcon, {
               [classes.linkIconActive]: isLinkActive,
             })}
-            style={{ margin: nested && -11 }}
+            style={{ margin: (nested && !icon) ? -11 : 0 }}
           >
-            {nested ? <Dot color={isLinkActive && 'primary'} /> : icon}
+            {nested ? (icon ? icon : <Dot color={isLinkActive && 'primary'} />) : icon}
           </ListItemIcon>
           <ListItemText
             classes={{
@@ -154,9 +154,9 @@ export default function SidebarLink({
             className={classnames(classes.linkIcon, {
               [classes.linkIconActive]: isLinkActive,
             })}
-            style={{ margin: nested && -11 }}
+            style={{ margin: (nested && !icon) ? -11 : 0 }}
           >
-            {nested ? <Dot color={isLinkActive && 'primary'} /> : icon}
+            {nested ? (icon ? icon : <Dot color={isLinkActive && 'primary'} />) : icon}
           </ListItemIcon>
           <ListItemText
             classes={{

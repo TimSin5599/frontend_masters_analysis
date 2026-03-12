@@ -1,30 +1,30 @@
 const usersFields = {
   id: { type: 'id', label: 'ID' },
 
-  firstName: { type: 'string', label: 'First Name' },
+  firstName: { type: 'string', label: 'First Name', required: true },
 
-  lastName: { type: 'string', label: 'Last Name' },
+  lastName: { type: 'string', label: 'Last Name', required: true },
 
   phoneNumber: { type: 'string', label: 'Phone Number' },
 
-  email: { type: 'string', label: 'E-Mail' },
+  email: { type: 'string', label: 'E-Mail', required: true },
 
   role: {
     type: 'enum',
     label: 'Role',
+    required: true,
 
     options: [
-      { value: 'admin', label: 'admin' },
-
-      { value: 'user', label: 'user' },
+      { value: 'admin', label: 'Admin' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'expert', label: 'Expert' },
+      { value: 'operator', label: 'Operator' },
     ],
   },
 
-  disabled: { type: 'boolean', label: 'Disabled' },
-
   avatar: { type: 'images', label: 'Avatar' },
 
-  password: { type: 'string', label: 'Password' },
+  password: { type: 'string', label: 'Password', required: true },
 
   emailVerified: { type: 'boolean', label: 'Email Verified' },
 

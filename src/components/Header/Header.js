@@ -1,29 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { AppBar, Toolbar, IconButton, Menu, MenuItem } from '@mui/material';
-import { useTheme } from '@mui/material';
 import {
-  Menu as MenuIcon,
   Person as AccountIcon,
-  ArrowBack as ArrowBackIcon,
+  ExitToApp as ExitToAppIcon
 } from '@mui/icons-material';
+import { AppBar, Menu, MenuItem, Toolbar, useTheme } from '@mui/material';
 import classNames from 'classnames';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-//images
-import profile from '../../images/main-profile.png';
+// images
 import config from '../../config';
+
+// structure
+import structure from '../Sidebar/SidebarStructure';
 
 // styles
 import useStyles from './styles';
 
 // components
-import { Typography, Avatar } from '../Wrappers/Wrappers';
+import { Typography } from '../Wrappers/Wrappers';
 
 // context
 import {
-  useLayoutState,
   useLayoutDispatch,
-  toggleSidebar,
 } from '../../context/LayoutContext';
 import {
   useManagementDispatch,
@@ -31,22 +29,21 @@ import {
 } from '../../context/ManagementContext';
 
 import { actions } from '../../context/ManagementContext';
-import { useUserDispatch, signOut } from '../../context/UserContext';
+import { signOut, useUserDispatch } from '../../context/UserContext';
 
 export default function Header(props) {
   let classes = useStyles();
   let theme = useTheme();
 
   // global
-  let layoutState = useLayoutState();
   let layoutDispatch = useLayoutDispatch();
   let userDispatch = useUserDispatch();
   const managementDispatch = useManagementDispatch();
 
   // local
   const [profileMenu, setProfileMenu] = useState(null);
+  const [programsMenu, setProgramsMenu] = useState(null);
   const [currentUser, setCurrentUser] = useState();
-  const [isSmall, setSmall] = useState(false);
 
   const managementValue = useManagementState();
 
@@ -73,73 +70,87 @@ export default function Header(props) {
     let windowWidth = window.innerWidth;
     let breakpointWidth = theme.breakpoints.values.md;
     let isSmallScreen = windowWidth < breakpointWidth;
-    setSmall(isSmallScreen);
   }
 
   return (
     <AppBar position='fixed' className={classes.appBar}>
       <Toolbar className={classes.toolbar}>
-        <IconButton
-          color='inherit'
-          onClick={() => toggleSidebar(layoutDispatch)}
-          className={classNames(
-            classes.headerMenuButton,
-            classes.headerMenuButtonCollapse,
-          )}
-        >
-          {(!layoutState.isSidebarOpened && isSmall) ||
-          (layoutState.isSidebarOpened && !isSmall) ? (
-            <ArrowBackIcon
-              classes={{
-                root: classNames(
-                  classes.headerIcon,
-                  classes.headerIconCollapse,
-                ),
-              }}
-            />
-          ) : (
-            <MenuIcon
-              classes={{
-                root: classNames(
-                  classes.headerIcon,
-                  classes.headerIconCollapse,
-                ),
-              }}
-            />
-          )}
-        </IconButton>
         <Typography variant='h6' weight='medium' className={classes.logotype}>
-          React Material Admin Full
+          Master's Analysis
         </Typography>
-        <div className={classes.grow} />
-        <IconButton
-          aria-haspopup='true'
-          color='inherit'
-          className={classes.headerMenuButton}
-          aria-controls='profile-menu'
-          onClick={(e) => setProfileMenu(e.currentTarget)}
-        >
-          <Avatar
-            alt={currentUser?.firstName}
-            // eslint-disable-next-line no-mixed-operators
-            src={
-              (currentUser?.avatar?.length >= 1 &&
-              currentUser?.avatar[currentUser.avatar.length - 1].publicUrl) || profile
+
+        {/* Horizontal Navigation Links */}
+        <div className={classes.navContainer} style={{ marginLeft: 'auto' }}>
+          {structure.map((item) => {
+            if (item.label === 'Пользователи' && currentUser?.role !== 'admin') {
+              return null;
             }
-            classes={{ root: classes.headerIcon }}
-          >
-            {currentUser?.firstName?.[0]}
-          </Avatar>
-        </IconButton>
-        <Typography
-          block
-          style={{ display: 'flex', alignItems: 'center', marginLeft: 8 }}
+            if (item.children) {
+              return (
+                <div key={item.id} className={classes.navItemWrapper}>
+                  <div
+                    className={classes.navLink}
+                    aria-controls='programs-menu'
+                    aria-haspopup='true'
+                    onClick={(e) => setProgramsMenu(e.currentTarget)}
+                  >
+                    <span className={classes.navIcon}>{item.icon}</span>
+                    <Typography variant='h6' className={classes.navText}>
+                      {item.label}
+                    </Typography>
+                  </div>
+                  <Menu
+                    id='programs-menu'
+                    anchorEl={programsMenu}
+                    open={Boolean(programsMenu)}
+                    onClose={() => setProgramsMenu(null)}
+                    classes={{ paper: classes.profileMenu }}
+                    disableAutoFocusItem
+                  >
+                    {item.children.map((child) => (
+                      <MenuItem
+                        key={child.label}
+                        onClick={() => setProgramsMenu(null)}
+                        className={classes.headerMenuItem}
+                      >
+                        <Link to={child.link} className={classes.dropdownLink}>
+                          <span className={classes.dropdownIcon}>{child.icon}</span>
+                          <Typography variant='body1'>{child.label}</Typography>
+                        </Link>
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                </div>
+              );
+            }
+            return (
+              <div key={item.id} className={classes.navItemWrapper}>
+                <Link to={item.link} className={classes.navLink}>
+                  <span className={classes.navIcon}>{item.icon}</span>
+                  <Typography variant='h6' className={classes.navText}>
+                    {item.label}
+                  </Typography>
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* <div className={classes.grow} /> */}
+
+        <div
+          className={classes.navLink}
+          aria-controls='profile-menu'
+          aria-haspopup='true'
+          onClick={(e) => setProfileMenu(e.currentTarget)}
+          style={{ paddingRight: 16 }}
         >
-          <div className={classes.profileLabel}>Hi,&nbsp;</div>
-          <Typography weight={'bold'} className={classes.profileLabel}>
-            {currentUser?.firstName}
+          <span className={classes.navIcon}><AccountIcon /></span>
+          <Typography variant='h6' className={classes.navText}>
+            Профиль
           </Typography>
-        </Typography>
+        </div>
+
         <Menu
           id='profile-menu'
           open={Boolean(profileMenu)}
@@ -153,14 +164,6 @@ export default function Header(props) {
             <Typography variant='h4' weight='medium'>
               {currentUser?.firstName}
             </Typography>
-            <Typography
-              className={classes.profileMenuLink}
-              component='a'
-              color='primary'
-              href='https://flatlogic.com'
-            >
-              Flatlogic.com
-            </Typography>
           </div>
           <MenuItem
             className={classNames(
@@ -169,19 +172,25 @@ export default function Header(props) {
             )}
           >
             <AccountIcon className={classes.profileMenuIcon} />
-            <Link to='/app/user/edit' style={{ textDecoration: 'none' }}>
+            <Link to='/app/profile' style={{ textDecoration: 'none' }}>
               Profile
             </Link>
           </MenuItem>
-          <div className={classes.profileMenuUser}>
+          <MenuItem
+            className={classNames(
+              classes.profileMenuItem,
+              classes.headerMenuItem,
+            )}
+            onClick={() => signOut(userDispatch, props.history)}
+          >
+            <ExitToAppIcon className={classes.profileMenuIcon} />
             <Typography
               className={classes.profileMenuLink}
               color='primary'
-              onClick={() => signOut(userDispatch, props.history)}
             >
               Sign Out
             </Typography>
-          </div>
+          </MenuItem>
         </Menu>
       </Toolbar>
     </AppBar>

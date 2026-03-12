@@ -1,5 +1,4 @@
-import React from 'react';
-import { Paper, Box } from '@mui/material';
+import { Box, Paper } from '@mui/material';
 import classnames from 'classnames';
 
 //components
@@ -22,6 +21,7 @@ export default function Widget({
   showMenu,
   style,
   widgetWithDropdown,
+  actions,
   ...props
 }) {
   let classes = useStyles(props);
@@ -78,6 +78,11 @@ export default function Widget({
                       </Typography>
                     </Box>
                   </Box>
+                  {actions && (
+                    <Box display="flex" alignItems="center">
+                      {actions}
+                    </Box>
+                  )}
                 </Box>
               </div>
             )}

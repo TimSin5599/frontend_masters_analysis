@@ -1,9 +1,9 @@
 import axios from 'axios';
-import config from '../config';
+import Errors from 'components/FormItems/error/errors';
+import { push } from 'connected-react-router';
 import jwt from 'jsonwebtoken';
 import { showSnackbar } from '../components/Snackbar';
-import { push } from 'connected-react-router';
-import Errors from 'components/FormItems/error/errors';
+import config from '../config';
 
 export const AUTH_FAILURE = 'AUTH_FAILURE';
 export const LOGIN_REQUEST = 'LOGIN_REQUEST';
@@ -20,7 +20,7 @@ export const REGISTER_REQUEST = 'REGISTER_REQUEST';
 export const REGISTER_SUCCESS = 'REGISTER_SUCCESS';
 
 async function findMe() {
-  const response = await axios.get('/auth/me');
+  const response = await axios.get(`${config.baseURLApi}/v1/auth/me`);
   return response.data;
 }
 
@@ -94,9 +94,9 @@ export function loginUser(creds) {
       window.location.href = config.baseURLApi + '/auth/signin/' + creds.social;
     } else if (creds.email.length > 0 && creds.password.length > 0) {
       axios
-        .post('/auth/signin/local', creds)
+        .post(`${config.baseURLApi}/v1/login`, creds)
         .then((res) => {
-          const token = res.data;
+          const token = res.data.token; // res.data is {token: ...}
           dispatch(receiveToken(token));
           dispatch(doInit());
           dispatch(push('/app'));
@@ -179,7 +179,7 @@ export function registerUser(creds) {
 
     if (creds.email.length > 0 && creds.password.length > 0) {
       axios
-        .post('/auth/signup', creds)
+        .post(`${config.baseURLApi}/v1/register`, creds)
         .then((res) => {
           dispatch({
             type: REGISTER_SUCCESS,

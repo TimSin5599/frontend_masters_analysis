@@ -1,36 +1,35 @@
-import React, { useEffect } from 'react';
-import { Grid, Box, TextField } from '@mui/material';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import { useParams } from 'react-router';
+import { Box, Grid, TextField } from '@mui/material';
 import Checkbox from '@mui/material/Checkbox';
 import Switch from '@mui/material/Switch';
-import { useLocation, useHistory } from 'react-router-dom';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import React, { useEffect } from 'react';
+import { useParams } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 import useStyles from './styles';
 
 import {
-  PersonOutline as PersonOutlineIcon,
   Lock as LockIcon,
+  PersonOutline as PersonOutlineIcon,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
-import { v4 as uuid } from 'uuid';
 
-import Widget from '../../components/Widget';
-import { Typography, Button } from '@mui/material';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import { Button, IconButton, InputAdornment, Typography } from '@mui/material';
 import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Widget from '../../components/Widget';
 
 import {
   useManagementDispatch,
   useManagementState,
 } from '../../context/ManagementContext';
-import config from '../../config';
-import Axios from 'axios';
 
-import { actions } from '../../context/ManagementContext';
 import { showSnackbar } from '../../components/Snackbar';
+import { actions } from '../../context/ManagementContext';
+import { generatePasswordHash } from '../../utils/hash';
 
 const EditUser = () => {
   const classes = useStyles();
@@ -42,6 +41,19 @@ const EditUser = () => {
   });
   const [data, setData] = React.useState(null);
   const [editable, setEditable] = React.useState(false);
+  const [passError, setPassError] = React.useState({ confirm: false, current: false });
+  const [showCurrentPassword, setShowCurrentPassword] = React.useState(false);
+  const [showNewPassword, setShowNewPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+
+  // Click handlers for toggling visibility
+  const handleClickShowCurrentPassword = () => setShowCurrentPassword((show) => !show);
+  const handleClickShowNewPassword = () => setShowNewPassword((show) => !show);
+  const handleClickShowConfirmPassword = () => setShowConfirmPassword((show) => !show);
+  const handleMouseDownPassword = (event) => {
+    event.preventDefault();
+  };
+
   let { id } = useParams();
   const fileInput = React.useRef(null);
   const handleChangeTab = (event, newValue) => {
@@ -51,65 +63,16 @@ const EditUser = () => {
   const managementDispatch = useManagementDispatch();
   const managementValue = useManagementState();
 
-  function extractExtensionFrom(filename) {
-    if (!filename) {
-      return null;
-    }
-
-    const regex = /(?:\.([^.]+))?$/;
-    return regex.exec(filename)[1];
-  }
-
-  const uploadToServer = async (file, path, filename) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('filename', filename);
-    const uri = `/file/upload/${path}`;
-    await Axios.post(uri, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    const privateUrl = `${path}/${filename}`;
-
-    return `${config.baseURLApi}/file/download?privateUrl=${privateUrl}`;
-  };
-
-  const handleFile = async (event) => {
-    const file = event.target.files[0];
-
-    const extension = extractExtensionFrom(file.name);
-    const id = uuid();
-    const filename = `${id}.${extension}`;
-    const privateUrl = `users/avatar/${filename}`;
-
-    const publicUrl = await uploadToServer(file, 'users/avatar', filename);
-    let avatarObj = {
-      id: id,
-      name: file.name,
-      sizeInBytes: file.size,
-      privateUrl,
-      publicUrl,
-      new: true,
-    };
-
-    setData({
-      ...data,
-      avatar: [...data.avatar, avatarObj],
-    });
-
-    return null;
-  };
   const history = useHistory();
 
   useEffect(() => {
-    actions.doFind(sessionStorage.getItem('user_id'))(managementDispatch);
+    const userId = id || sessionStorage.getItem('user_id');
+    actions.doFind(userId)(managementDispatch);
     // eslint-disable-next-line  react-hooks/exhaustive-deps
-  }, []);
+  }, [id]);
 
   useEffect(() => {
-    if (location.pathname.includes('edit')) {
+    if (location.pathname.includes('edit') || location.pathname.includes('profile')) {
       setEditable(true);
     }
   }, [location.pathname]);
@@ -118,43 +81,85 @@ const EditUser = () => {
     setData(managementValue.currentUser);
   }, [managementDispatch, managementValue, id]);
 
-  const deleteOneImage = (id) => {
-    setData({
-      ...data,
-      avatar: data.avatar.filter((avatar) => avatar.id !== id),
-    });
-  };
-
   function handleSubmit() {
+    const userId = id || sessionStorage.getItem('user_id');
     actions.doUpdate(
-      sessionStorage.getItem('user_id'),
+      userId,
       data,
       history,
     )(managementDispatch);
     showSnackbar({ type: 'success', message: 'User Edited' });
   }
 
-  function handleUpdatePassword() {
-    actions.doChangePassword(password)(managementDispatch);
+  async function handleUpdatePassword() {
+    setPassError({ confirm: false, current: false });
+    if (password.newPassword !== password.confirmPassword) {
+      setPassError(prev => ({ ...prev, confirm: true }));
+      return;
+    }
+    if (!password.currentPassword || !password.newPassword) {
+      return; // Basic safeguard
+    }
+
+    try {
+      await actions.doChangePassword(password)(managementDispatch);
+      setPassword({ newPassword: '', confirmPassword: '', currentPassword: '' }); // Clear fields on success
+    } catch (err) {
+      setPassError(prev => ({ ...prev, current: true }));
+    }
   }
 
   function handleChangePassword(e) {
-    setPassword({
+    const newPassData = {
       ...password,
       [e.target.name]: e.target.value,
-    });
+    };
+    setPassword(newPassData);
+    setPassError({ confirm: false, current: false });
   }
 
+  useEffect(() => {
+    // Only run validation if at least one field is filled
+    if (!password.newPassword && !password.confirmPassword && !password.currentPassword) {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      let errors = { confirm: false, current: false };
+
+      // Password mismatch check
+      if (password.newPassword && password.confirmPassword && password.newPassword !== password.confirmPassword) {
+        errors.confirm = true;
+      }
+
+      // Current password hash check
+      if (password.currentPassword) {
+        const typedHash = await generatePasswordHash(password.currentPassword);
+        const storedHash = localStorage.getItem('cPwdH');
+        if (storedHash && typedHash !== storedHash) {
+          errors.current = true;
+        }
+      }
+
+      if (errors.confirm || errors.current) {
+        setPassError(errors);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [password]);
+
   function handleChange(e) {
+    const { name, value } = e.target;
     setData({
       ...data,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
   }
 
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
+    <Grid container spacing={3} justifyContent="center">
+      <Grid item xs={12} md={8}>
         <Widget>
           <Box display={'flex'} justifyContent={'center'}>
             <Tabs
@@ -164,11 +169,6 @@ const EditUser = () => {
               onChange={handleChangeTab}
               aria-label='full width tabs example'
             >
-              <Tab
-                label='ACCOUNT'
-                icon={<PersonOutlineIcon />}
-                classes={{ wrapper: classes.icon }}
-              />
               <Tab
                 label='PROFILE'
                 icon={<PersonOutlineIcon />}
@@ -183,97 +183,18 @@ const EditUser = () => {
           </Box>
         </Widget>
       </Grid>
-      <Grid item xs={12}>
+      <Grid item xs={12} md={8} lg={6}>
         <Widget>
           <Grid item justifyContent={'center'} container>
-            <Box display={'flex'} flexDirection={'column'} width={600}>
+            <Box display={'flex'} flexDirection={'column'} width={'100%'}>
               {tab === 0 ? (
                 <>
                   <Typography
                     variant={'h5'}
                     weight={'medium'}
-                    style={{ marginBottom: 30 }}
-                  >
-                    Account
-                  </Typography>
-                  <TextField
-                    label='First Name'
-                    value={data?.firstName || ''}
-                    onChange={handleChange}
-                    name='firstName'
-                    variant='outlined'
-                    style={{ marginBottom: 35 }}
-                  />
-                  <TextField
-                    label='Email'
-                    value={data?.email || ''}
-                    name='email'
-                    onChange={handleChange}
-                    variant='outlined'
-                    style={{ marginBottom: 35 }}
-                    disabled
-                  />
-                  <FormControl variant='outlined' style={{ marginBottom: 35 }}>
-                    <InputLabel id='demo-simple-select-outlined-label'>
-                      Role
-                    </InputLabel>
-                    <Select
-                      labelId='demo-simple-select-outlined-label'
-                      label='Role'
-                      id='demo-simple-select-outlined'
-                      defaultValue='user'
-                      value={data?.role || ''}
-                      name='email'
-                      onChange={handleChange}
-                    >
-                      <MenuItem value={'admin'}>Admin</MenuItem>
-                      <MenuItem value={'user'}>User</MenuItem>
-                    </Select>
-                  </FormControl>
-                </>
-              ) : tab === 1 ? (
-                <>
-                  <Typography
-                    variant={'h5'}
-                    weight={'medium'}
-                    style={{ marginBottom: 35 }}
+                    style={{ marginBottom: 35, marginTop: 15 }}
                   >
                     Personal Information
-                  </Typography>
-                  <Typography weight={'medium'}>Photo:</Typography>
-                  <div className={classes.galleryWrap}>
-                    {data && data.avatar && data.avatar.length !== 0
-                      ? data.avatar.map((avatar, idx) => (
-                          <div className={classes.imgWrap}>
-                            <span
-                              className={classes.deleteImageX}
-                              onClick={() => deleteOneImage(avatar.id)}
-                            ></span>
-                            <img
-                              src={avatar.publicUrl}
-                              alt='avatar'
-                              height={'100%'}
-                            />
-                          </div>
-                        ))
-                      : null}
-                  </div>
-                  <label
-                    className={classes.uploadLabel}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {'Upload an image'}
-                    <input
-                      style={{ display: 'none' }}
-                      accept='image/*'
-                      type='file'
-                      ref={fileInput}
-                      onChange={handleFile}
-                    />
-                  </label>
-
-                  <Typography size={'sm'} style={{ marginBottom: 35 }}>
-                    .PNG, .JPG, .JPEG
                   </Typography>
                   <TextField
                     label='Name'
@@ -314,44 +235,90 @@ const EditUser = () => {
                     disabled
                   />
                 </>
-              ) : tab === 2 ? (
+              ) : tab === 1 ? (
                 <>
                   <Typography
                     variant={'h5'}
                     weight={'medium'}
-                    style={{ marginBottom: 35 }}
+                    style={{ marginBottom: 35, marginTop: 15 }}
                   >
                     Password
                   </Typography>
                   <TextField
                     label='Current Password'
-                    type='password'
+                    type={showCurrentPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
                     defaultValue={'Current Password'}
                     value={password.currentPassword || ''}
                     name='currentPassword'
                     onChange={handleChangePassword}
+                    error={passError.current}
+                    helperText={passError.current ? 'Неверный текущий пароль' : ''}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowCurrentPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                          >
+                            {showCurrentPassword ? <Visibility /> : <VisibilityOff />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                   />
                   <TextField
                     label='New Password'
-                    type='password'
+                    type={showNewPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
                     defaultValue={'New Password'}
                     value={password.newPassword || ''}
                     name='newPassword'
                     onChange={handleChangePassword}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowNewPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                          >
+                            {showNewPassword ? <Visibility /> : <VisibilityOff />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                   />
                   <TextField
                     label='Confirm Password'
-                    type='password'
+                    type={showConfirmPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
                     defaultValue={'Verify Password'}
                     value={password.confirmPassword || ''}
                     name='confirmPassword'
                     onChange={handleChangePassword}
+                    error={passError.confirm}
+                    helperText={passError.confirm ? 'Новый пароль не совпадает' : ''}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowConfirmPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                          >
+                            {showConfirmPassword ? <Visibility /> : <VisibilityOff />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                   />
                 </>
               ) : (
@@ -406,23 +373,17 @@ const EditUser = () => {
                 </>
               )}
               {editable && (
-                <Box display={'flex'} justifyContent={'space-between'}>
-                  {tab !== 2 ? (
+                <Box display={'flex'} justifyContent={'flex-end'}>
+                  {tab !== 1 ? (
                     <>
-                      <Button variant={'outlined'} color={'primary'}>
-                        Reset
-                      </Button>
-                      <Button variant={'contained'} onClick={handleSubmit}>
+                      <Button variant={'outlined'} onClick={handleSubmit}>
                         Save
                       </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant={'outlined'} color={'primary'}>
-                        Reset
-                      </Button>
                       <Button
-                        variant={'contained'}
+                        variant={'outlined'}
                         onClick={handleUpdatePassword}
                       >
                         Save Password

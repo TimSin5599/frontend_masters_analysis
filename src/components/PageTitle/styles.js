@@ -7,6 +7,12 @@ export default makeStyles((theme) => ({
     marginBottom: theme.spacing(4),
     marginTop: theme.spacing(5),
   },
+  pageTitleContainerDense: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing(1),
+    marginTop: theme.spacing(2),
+  },
   typo: {
     color: theme.palette.text.hint,
   },

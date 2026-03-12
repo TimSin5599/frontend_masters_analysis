@@ -1,11 +1,13 @@
-import React from 'react';
 import axios from 'axios';
-import { mockUser } from './mock';
+import React from 'react';
 import config from '../../src/config';
 import { showSnackbar } from '../components/Snackbar';
+import { generatePasswordHash } from '../utils/hash';
+import { mockUser } from './mock';
 
-async function list() {
-  const response = await axios.get(`/users`);
+async function list(filter = {}) {
+  const params = new URLSearchParams(filter).toString();
+  const response = await axios.get(`${config.baseURLApi}/v1/users${params ? `?${params}` : ''}`);
   return response.data;
 }
 
@@ -219,15 +221,25 @@ const actions = {
       });
     } else {
       try {
+        if (!id || id === 'undefined') {
+          console.error("doFind: missing or invalid id", id);
+          return;
+        }
+
         dispatch({
           type: 'USERS_FORM_FIND_STARTED',
         });
 
-        axios.get(`/users/${id}`).then((res) => {
+        axios.get(`${config.baseURLApi}/v1/users/${id}`).then((res) => {
           const currentUser = res.data;
           dispatch({
             type: 'USERS_FORM_FIND_SUCCESS',
             payload: currentUser,
+          });
+        }).catch(error => {
+          console.error("doFind: axios error", error);
+          dispatch({
+            type: 'USERS_FORM_FIND_ERROR',
           });
         });
       } catch (error) {
@@ -245,11 +257,11 @@ const actions = {
       dispatch({
         type: 'USERS_FORM_CREATE_STARTED',
       });
-      axios.post('/users', { data: values }).then((res) => {
+      axios.post(`${config.baseURLApi}/v1/users`, values).then((res) => {
         dispatch({
           type: 'USERS_FORM_CREATE_SUCCESS',
         });
-        history.push('/app/user/list');
+        history.push('/app/users');
       });
     } catch (error) {
       showSnackbar({ type: 'error', message: 'Error' });
@@ -266,14 +278,14 @@ const actions = {
         type: 'USERS_FORM_UPDATE_STARTED',
       });
 
-      await axios.put(`/users/${id}`, { id, data: values });
+      await axios.put(`${config.baseURLApi}/v1/users/${id}`, values);
 
       dispatch({
         type: 'USERS_FORM_UPDATE_SUCCESS',
         payload: values,
       });
 
-      history.push('/admin/dashboard');
+      history.push('/app/profile');
     } catch (error) {
       console.log(error);
 
@@ -285,67 +297,71 @@ const actions = {
 
   doChangePassword:
     ({ newPassword, currentPassword }) =>
-    async (dispatch) => {
-      try {
-        dispatch({
-          type: 'USERS_FORM_CREATE_STARTED',
-        });
-        await axios.put('/auth/password-update', {
-          newPassword,
-          currentPassword,
-        });
-        dispatch({
-          type: 'USERS_PASSWORD_UPDATE_SUCCESS',
-        });
-
-        showSnackbar({ type: 'success', message: 'Password updated' });
-      } catch (error) {
-        showSnackbar({ type: 'error', message: 'Error' });
-        console.log(error);
-
-        dispatch({
-          type: 'USERS_FORM_CREATE_ERROR',
-        });
-      }
-    },
-
-  doFetch:
-    (filter, keepPagination = false) =>
-    async (dispatch) => {
-      if (!config.isBackend) {
-        dispatch({
-          type: 'USERS_LIST_FETCH_SUCCESS',
-          payload: {
-            rows: [mockUser],
-            count: 1,
-          },
-        });
-      } else {
+      async (dispatch) => {
         try {
           dispatch({
-            type: 'USERS_LIST_FETCH_STARTED',
-            payload: { filter, keepPagination },
+            type: 'USERS_FORM_CREATE_STARTED',
           });
-
-          const response = await list();
-
+          // Call the auth-service endpoint
+          await axios.post(`${config.baseURLApi.replace('8080', '8081')}/v1/auth/change-password`, {
+            oldPassword: currentPassword,
+            newPassword: newPassword,
+          });
           dispatch({
-            type: 'USERS_LIST_FETCH_SUCCESS',
-            payload: {
-              rows: response.rows,
-              count: response.count,
-            },
+            type: 'USERS_PASSWORD_UPDATE_SUCCESS',
           });
+          const newHash = await generatePasswordHash(newPassword);
+          localStorage.setItem('cPwdH', newHash);
+
+          showSnackbar({ type: 'success', message: 'Password updated' });
         } catch (error) {
-          showSnackbar({ type: 'error', message: 'Error' });
+          showSnackbar({ type: 'error', message: 'Error updating password' });
           console.log(error);
 
           dispatch({
-            type: 'USERS_LIST_FETCH_ERROR',
+            type: 'USERS_FORM_CREATE_ERROR',
           });
+          throw error;
         }
-      }
-    },
+      },
+
+  doFetch:
+    (filter, keepPagination = false) =>
+      async (dispatch) => {
+        if (!config.isBackend) {
+          dispatch({
+            type: 'USERS_LIST_FETCH_SUCCESS',
+            payload: {
+              rows: [mockUser],
+              count: 1,
+            },
+          });
+        } else {
+          try {
+            dispatch({
+              type: 'USERS_LIST_FETCH_STARTED',
+              payload: { filter, keepPagination },
+            });
+
+            const response = await list(filter);
+
+            dispatch({
+              type: 'USERS_LIST_FETCH_SUCCESS',
+              payload: {
+                rows: response.rows,
+                count: response.count,
+              },
+            });
+          } catch (error) {
+            showSnackbar({ type: 'error', message: 'Error' });
+            console.log(error);
+
+            dispatch({
+              type: 'USERS_LIST_FETCH_ERROR',
+            });
+          }
+        }
+      },
 
   doDelete: (id) => async (dispatch) => {
     if (!config.isBackend) {
@@ -396,8 +412,6 @@ const actions = {
 };
 
 export {
-  ManagementProvider,
-  useManagementState,
-  useManagementDispatch,
-  actions,
+  actions, ManagementProvider, useManagementDispatch, useManagementState
 };
+

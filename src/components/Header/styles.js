@@ -1,5 +1,5 @@
-import { makeStyles } from '@mui/styles';
 import { alpha } from '@mui/material/styles';
+import { makeStyles } from '@mui/styles';
 
 export default makeStyles((theme) => ({
   logotype: {
@@ -177,4 +177,51 @@ export default makeStyles((theme) => ({
       display: 'none',
     },
   },
+  navContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginLeft: theme.spacing(4),
+  },
+  navItemWrapper: {
+    marginRight: theme.spacing(3),
+  },
+  navLink: {
+    display: 'flex',
+    alignItems: 'center',
+    textDecoration: 'none',
+    color: 'rgba(255, 255, 255, 0.7)',
+    cursor: 'pointer',
+    padding: theme.spacing(1),
+    borderRadius: 8,
+    transition: 'background-color 0.3s, color 0.3s',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      color: '#fff',
+    },
+  },
+  navIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: theme.spacing(1),
+    '& svg': {
+      fontSize: 24,
+    }
+  },
+  navText: {
+    fontSize: 16,
+    fontWeight: 500,
+  },
+  dropdownLink: {
+    display: 'flex',
+    alignItems: 'center',
+    textDecoration: 'none',
+    color: theme.palette.text.primary,
+    width: '100%',
+  },
+  dropdownIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    marginRight: theme.spacing(1.5),
+    color: theme.palette.text.hint,
+  }
 }));

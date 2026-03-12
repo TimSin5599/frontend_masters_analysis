@@ -1,7 +1,8 @@
-import React from 'react';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
+import React from 'react';
 
+import { generatePasswordHash } from '../utils/hash';
 import { mockUser } from './mock';
 
 //config
@@ -96,7 +97,7 @@ function useUserDispatch() {
   return context;
 }
 
-export { UserProvider, useUserState, useUserDispatch, loginUser, signOut };
+export { changeUserPassword, loginUser, signOut, updateUserProfile, UserProvider, useUserDispatch, useUserState };
 
 // ###########################################################
 
@@ -118,20 +119,16 @@ function loginUser(
     setIsLoading(false);
     receiveToken('token', dispatch);
   } else {
-    if (!!social) {
-      window.location.href =
-        config.baseURLApi +
-        '/auth/signin/' +
-        social +
-        '?app=' +
-        config.redirectUrl;
-    } else if (login.length > 0 && password.length > 0) {
+    // Backend integration
+    if (login.length > 0 && password.length > 0) {
       axios
-        .post('/auth/signin/local', { email: login, password })
-        .then((res) => {
-          const token = res.data;
+        .post(`${config.baseURLApi}/v1/login`, { email: login, password })
+        .then(async (res) => {
+          const token = res.data.token;
           setError(null);
           setIsLoading(false);
+          const hash = await generatePasswordHash(password);
+          localStorage.setItem('cPwdH', hash);
           receiveToken(token, dispatch);
           doInit()(dispatch);
         })
@@ -140,7 +137,7 @@ function loginUser(
           setIsLoading(false);
         });
     } else {
-      dispatch({ type: 'LOGIN_FAILURE' });
+      dispatch({ type: 'AUTH_FAILURE', payload: 'Login and password are required' });
     }
   }
 }
@@ -154,7 +151,7 @@ export function sendPasswordResetEmail(email) {
         type: 'PASSWORD_RESET_EMAIL_REQUEST',
       });
       axios
-        .post('/auth/send-password-reset-email', { email })
+        .post(`${config.baseURLApi}/v1/auth/send-password-reset-email`, { email })
         .then((res) => {
           dispatch({
             type: 'PASSWORD_RESET_EMAIL_SUCCESS',
@@ -175,6 +172,7 @@ function signOut(dispatch, history) {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('user_id');
+  localStorage.removeItem('cPwdH');
   document.cookie = 'token=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
   axios.defaults.headers.common['Authorization'] = '';
   dispatch({ type: 'SIGN_OUT_SUCCESS' });
@@ -186,7 +184,12 @@ export function receiveToken(token, dispatch) {
 
   // We check if app runs with backend mode
   if (config.isBackend) {
-    user = jwt.decode(token).user;
+    const decoded = jwt.decode(token);
+    if (decoded && decoded.user) {
+      user = decoded.user;
+    } else {
+      user = { email: 'unknown' };
+    }
     delete user.id;
   } else {
     user = {
@@ -204,7 +207,7 @@ export function receiveToken(token, dispatch) {
 
 async function findMe() {
   if (config.isBackend) {
-    const response = await axios.get('/auth/me');
+    const response = await axios.get(`${config.baseURLApi}/v1/auth/me`);
     return response.data;
   } else {
     return mockUser;
@@ -236,7 +239,9 @@ export function doInit() {
         if (token) {
           currentUser = await findMe();
         }
-        sessionStorage.setItem('user_id', currentUser.id);
+        if (currentUser && currentUser.id) {
+          sessionStorage.setItem('user_id', currentUser.id);
+        }
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -272,8 +277,10 @@ export function registerUser(
         type: 'REGISTER_REQUEST',
       });
       if (login.length > 0 && password.length > 0) {
+        const payload = { email: login, password, role: 'user' };
+        console.log("Register payload:", payload);
         axios
-          .post('/auth/signup', { email: login, password })
+          .post(`${config.baseURLApi}/v1/register`, payload)
           .then((res) => {
             dispatch({
               type: 'REGISTER_SUCCESS',
@@ -283,7 +290,8 @@ export function registerUser(
               message:
                 "You've been registered successfully. Please check your email for verification link",
             });
-            history.push('/login');
+
+            // history.push('/login');
           })
           .catch((err) => {
             dispatch(authError(err.response.data));
@@ -301,7 +309,7 @@ export function verifyEmail(token, history) {
       history.push('/login');
     } else {
       axios
-        .put('/auth/verify-email', { token })
+        .put(`${config.baseURLApi}/v1/auth/verify-email`, { token })
         .then((verified) => {
           if (verified) {
             showSnackbar({
@@ -329,7 +337,7 @@ export function resetPassword(token, password, history) {
         type: 'RESET_REQUEST',
       });
       axios
-        .put('/auth/password-reset', { token, password })
+        .put(`${config.baseURLApi}/v1/auth/password-reset`, { token, password })
         .then((res) => {
           dispatch({
             type: 'RESET_SUCCESS',
@@ -345,4 +353,38 @@ export function resetPassword(token, password, history) {
         });
     }
   };
+}
+async function updateUserProfile(dispatch, userData) {
+  if (!config.isBackend) return;
+
+  try {
+    const userId = sessionStorage.getItem('user_id');
+    await axios.put(`${config.baseURLApi}/v1/users/${userId}`, userData);
+
+    // Refresh user data
+    const updatedUser = await findMe();
+    dispatch({
+      type: 'LOGIN_SUCCESS',
+      payload: { currentUser: updatedUser },
+    });
+
+    showSnackbar({ type: 'success', message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error(error);
+    showSnackbar({ type: 'error', message: 'Failed to update profile' });
+  }
+}
+
+async function changeUserPassword(oldPassword, newPassword) {
+  if (!config.isBackend) return;
+
+  try {
+    await axios.post(`${config.baseURLApi}/v1/auth/change-password`, { oldPassword, newPassword });
+    showSnackbar({ type: 'success', message: 'Password changed successfully' });
+  } catch (error) {
+    console.error(error);
+    const msg = error.response?.data?.error || 'Failed to change password';
+    showSnackbar({ type: 'error', message: msg });
+    throw error;
+  }
 }

@@ -1,20 +1,18 @@
-import Errors from 'components/FormItems/error/errors';
 import axios from 'axios';
+import Errors from 'components/FormItems/error/errors';
 import queryString from 'query-string';
+import config from '../../config';
 
 async function list(filter) {
   const response = await axios.get(
-    `/users?page=${filter.page}&limit=${filter.limit}
-
-    &users=${filter.users ? filter.users : ''}
-    &${queryString.stringify(filter.orderBy)}${filter.request}`,
+    `${config.baseURLApi}/v1/users?page=${filter.page}&limit=${filter.limit}&users=${filter.users ? filter.users : ''}&${queryString.stringify(filter.orderBy)}${filter.request}`,
   );
   return response.data;
 }
 
 async function filterUsers(request, filter) {
   const response = await axios.get(
-    `/users?page=${filter.page}&limit=${filter.limit}${request}`,
+    `${config.baseURLApi}/v1/users?page=${filter.page}&limit=${filter.limit}${request}`,
   );
   return response.data;
 }
@@ -41,30 +39,30 @@ const actions = {
 
   doFetch:
     (filter, keepPagination = false) =>
-    async (dispatch, getState) => {
-      try {
-        dispatch({
-          type: 'USERS_LIST_FETCH_STARTED',
-          payload: { filter, keepPagination },
-        });
+      async (dispatch, getState) => {
+        try {
+          dispatch({
+            type: 'USERS_LIST_FETCH_STARTED',
+            payload: { filter, keepPagination },
+          });
 
-        const response = await list(filter);
+          const response = await list(filter);
 
-        dispatch({
-          type: 'USERS_LIST_FETCH_SUCCESS',
-          payload: {
-            rows: response.rows,
-            count: response.count,
-          },
-        });
-      } catch (error) {
-        Errors.handle(error);
+          dispatch({
+            type: 'USERS_LIST_FETCH_SUCCESS',
+            payload: {
+              rows: response.rows,
+              count: response.count,
+            },
+          });
+        } catch (error) {
+          Errors.handle(error);
 
-        dispatch({
-          type: 'USERS_LIST_FETCH_ERROR',
-        });
-      }
-    },
+          dispatch({
+            type: 'USERS_LIST_FETCH_ERROR',
+          });
+        }
+      },
 
   doDelete: (filter, id) => async (dispatch) => {
     try {
@@ -72,7 +70,7 @@ const actions = {
         type: 'USERS_LIST_DELETE_STARTED',
       });
 
-      await axios.delete(`/users/${id}`);
+      await axios.delete(`${config.baseURLApi}/v1/users/${id}`);
 
       dispatch({
         type: 'USERS_LIST_DELETE_SUCCESS',

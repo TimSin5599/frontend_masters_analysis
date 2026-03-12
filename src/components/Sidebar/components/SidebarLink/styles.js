@@ -23,7 +23,7 @@ export default makeStyles((theme) => ({
     backgroundColor: theme.palette.background.default,
   },
   linkNested: {
-    paddingLeft: 25,
+    paddingLeft: 60,
     '&:hover, &:focus': {
       backgroundColor:
         theme.palette.type === 'dark'
@@ -52,6 +52,7 @@ export default makeStyles((theme) => ({
         : theme.palette.text.secondary + 'CC',
     transition: theme.transitions.create(['opacity', 'color']),
     fontSize: 14,
+    whiteSpace: 'normal',
   },
   linkTextActive: {
     color: theme.palette.text.primary,
