@@ -1,15 +1,26 @@
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import CodeIcon from '@mui/icons-material/Code';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Grid, IconButton, LinearProgress, Paper, Tab, Tabs, TextField, Typography, Tooltip } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Grid, IconButton, LinearProgress, Paper, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import config from "../../../config";
 
 // components
 import PageTitle from "../../../components/PageTitle/PageTitle";
+import AchievementsSection from "./components/AchievementsSection";
+import AdditionalEducationSection from "./components/AdditionalEducationSection";
+import EducationSection from "./components/EducationSection";
+import { ExpertEvaluationsTab, ExpertScoreSection } from "./components/ExpertEvaluations";
+import LanguageSection from "./components/LanguageSection";
+import MotivationSection from "./components/MotivationSection";
+import PersonalDataSection from "./components/PersonalDataSection";
+import RecommendationSection from "./components/RecommendationSection";
+
+// hook
+import { useApplicantDetails } from "./hooks/useApplicantDetails";
 
 export default function ApplicantDetails() {
     const theme = useTheme();
@@ -19,306 +30,48 @@ export default function ApplicantDetails() {
     // Parse query params to find program_id if available
     const queryParams = new URLSearchParams(location.search);
     const programId = queryParams.get("program_id") || queryParams.get("?program_id");
-    const [applicantName, setApplicantName] = useState(`Абитуриент #${id}`);
-    const [activeCategory, setActiveCategory] = useState("passport");
+
+    const [activeCategory, setActiveCategory] = useState("personal_data");
     const [activeMainTab, setActiveMainTab] = useState("info");
-    const [activeDocumentId, setActiveDocumentId] = useState(null);
-    const [processingState, setProcessingState] = useState({});
-    const [evaluations, setEvaluations] = useState([]);
-    const [expertSlots, setExpertSlots] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
     const [viewMode, setViewMode] = useState("form"); // "form" or "json"
 
-    const updateProcessingState = (category, status, progressVal) => {
-        setProcessingState(prev => {
-            const current = prev[category] || {};
-            const newProgress = typeof progressVal === 'function' ? progressVal(current.progress || 0) : (progressVal !== undefined ? progressVal : current.progress);
-            return {
-                ...prev,
-                [category]: {
-                    status: status !== undefined ? status : current.status,
-                    progress: newProgress
-                }
-            };
-        });
-    };
-
-    const processingStatus = processingState[activeCategory]?.status || null;
-    const progress = processingState[activeCategory]?.progress || 0;
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [rescanDialogOpen, setRescanDialogOpen] = useState(false);
-
-    // Sub-tab for multi-document categories (work, recommendation, achievement)
-    const [activeSubTab, setActiveSubTab] = useState(0);
-    const [hoveredTab, setHoveredTab] = useState(null);
-
-    // Reset sub-tab and view mode when category changes
-    useEffect(() => {
-        setActiveSubTab(0);
-        setViewMode("form");
-    }, [activeCategory]);
-
-    // WebSocket Connection Handling
-    useEffect(() => {
-        let socket;
-        let reconnectTimeout;
-
-        const connectWebSocket = () => {
-            const wsUrl = config.manageApi.replace('http', 'ws') + `/v1/applicants/${id}/ws`;
-            socket = new WebSocket(wsUrl);
-
-            socket.onmessage = (event) => {
-                const msgData = JSON.parse(event.data);
-                console.log("WebSocket event:", msgData);
-
-                const isRelatedCategory = msgData.category === activeCategory ||
-                    (msgData.category === 'transcript' && activeCategory === 'diploma') ||
-                    (msgData.category === 'diploma' && activeCategory === 'transcript');
-
-                if (msgData.category) {
-                    if (msgData.status === 'completed') {
-                        updateProcessingState(msgData.category, 'completed', 100);
-                        if (isRelatedCategory) fetchData(); // Refresh the data for this category
-                    } else if (msgData.status === 'failed') {
-                        updateProcessingState(msgData.category, 'failed');
-                        alert(`Ошибка обработки: ${msgData.error || "Неизвестная ошибка"}`);
-                        setTimeout(() => updateProcessingState(msgData.category, null), 3000);
-                    } else {
-                        updateProcessingState(msgData.category, 'processing', msgData.progress || 0);
-                    }
-                }
-            };
-
-            socket.onerror = (error) => console.error("WebSocket error:", error);
-
-            socket.onclose = () => {
-                console.log("WebSocket connection closed for applicant", id);
-                // Try to reconnect in 3 seconds
-                reconnectTimeout = setTimeout(() => {
-                    console.log("Attempting WebSocket reconnection...");
-                    connectWebSocket();
-                }, 3000);
-            };
-        };
-
-        connectWebSocket();
-
-        return () => {
-            clearTimeout(reconnectTimeout);
-            if (socket && socket.readyState === 1) { // 1 is OPEN
-                socket.close();
-            }
-        };
-    }, [id, activeCategory]);
-
-    // Smart Progress Bar Logic - Now partially driven by WebSockets
-    useEffect(() => {
-        let interval;
-        // If processing and we need simulated progress (e.g. from upload click)
-        if (processingStatus === 'processing') {
-            interval = setInterval(() => {
-                updateProcessingState(activeCategory, undefined, prev => {
-                    // If we receive a higher real progress value from WebSocket, don't overwrite it
-                    // but if it's still small, animate it.
-                    if (prev < 15) return prev + 5;
-                    if (prev < 30) return prev + 2;
-                    if (prev < 90) return prev + 0.5;
-                    return prev;
-                });
-            }, 1000);
-        } else if (processingStatus === 'completed') {
-            updateProcessingState(activeCategory, undefined, 100);
-            const timer = setTimeout(() => {
-                updateProcessingState(activeCategory, null, 0);
-            }, 3000);
-            return () => clearTimeout(timer);
-        } else if (!processingStatus) {
-            updateProcessingState(activeCategory, undefined, 0);
-        }
-        return () => clearInterval(interval);
-    }, [processingStatus, activeCategory]);
-
-    // Fetch initial name from passport data
-    useEffect(() => {
-        axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=passport`)
-            .then(res => {
-                if (res.data && res.data.name && res.data.surname) {
-                    setApplicantName(`${res.data.name} ${res.data.surname}`);
-                }
-            })
-            .catch(console.error);
-        
-        // Fetch evaluations
-        fetchEvaluations();
-        
-        // Fetch expert slots
-        axios.get(`${config.manageApi}/v1/experts/slots`)
-            .then(res => setExpertSlots(res.data))
-            .catch(console.error);
-
-        // Get current user from local storage
-        try {
-            const userStr = localStorage.getItem("user");
-            if (userStr) {
-                setCurrentUser(JSON.parse(userStr));
-            }
-        } catch (e) {
-            console.error("Error parsing user from localStorage", e);
-        }
-    }, [id]);
-
-    const fetchEvaluations = () => {
-        axios.get(`${config.manageApi}/v1/applicants/${id}/evaluations`)
-            .then(res => setEvaluations(res.data))
-            .catch(console.error);
-    };
-
-    const fetchData = () => {
-        setLoading(true);
-        setActiveDocumentId(null); // Reset document view when category changes
-        setIsEditing(false); // Reset editing state
-        axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=${activeCategory}`)
-            .then(res => {
-                setData(res.data);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error(err);
-                setData(null);
-                setLoading(false);
-            });
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, [id, activeCategory]);
-
-
-
-
-    const handleSave = () => {
-        let userMeta = {};
-        try {
-            const userStr = localStorage.getItem("user");
-            if (userStr) {
-                const userObj = JSON.parse(userStr);
-                userMeta = {
-                    role: userObj.role === 'admin' ? 'админ' : 'оператор',
-                    first_name: userObj.firstName || "",
-                    last_name: userObj.lastName || "",
-                    patronymic: userObj.patronymic || ""
-                };
-            }
-        } catch (e) {
-            console.error("Error parsing user from localStorage", e);
-        }
-
-        const payload = Array.isArray(data) 
-            ? { records: data, ...userMeta }
-            : { ...data, ...userMeta };
-
-        axios.patch(`${config.manageApi}/v1/applicants/${id}/data?category=${activeCategory}`, payload)
-            .then(() => {
-                alert("Данные успешно сохранены");
-                setIsEditing(false);
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Ошибка при сохранении данных");
-            });
-    };
-
-    const handleRescan = () => {
-        setRescanDialogOpen(true);
-    };
-
-    const confirmRescan = () => {
-        setRescanDialogOpen(false);
-        console.log("RESCAN CONFIRMED. docId before:", activeDocumentId, "data:", data, "activeCategory:", activeCategory);
-
-        let docId = activeDocumentId;
-        // If not explicitly selected, try to find from data for single-record categories
-        if (!docId && data && !Array.isArray(data) && data.document_id) {
-            docId = data.document_id;
-        }
-
-        console.log("Selected docId for rescan:", docId);
-
-        updateProcessingState(activeCategory, 'processing', 0); // Show bar immediately
-
-        // Strategy 1: If we have a specific document ID, use it
-        if (docId) {
-            console.log(`Triggering Strategy 1: /v1/documents/${docId}/reprocess`);
-            axios.post(`${config.manageApi}/v1/documents/${docId}/reprocess`)
-                .then(() => {
-                    console.log("Rescan Strategy 1 triggered successfully");
-                    // WebSocket will handle status updates automatically
-                })
-                .catch(err => {
-                    console.error("Error in Rescan Strategy 1:", err);
-                    alert("Ошибка при запуске повторного сканирования (ID)");
-                    updateProcessingState(activeCategory, null);
-                });
-        }
-        // Strategy 2: Fallback to reprocessing latest document by category
-        else {
-            console.log(`Triggering Strategy 2: /v1/applicants/${id}/documents/reprocess?category=${activeCategory}`);
-            axios.post(`${config.manageApi}/v1/applicants/${id}/documents/reprocess?category=${activeCategory}`)
-                .then((res) => {
-                    console.log("Rescan Strategy 2 triggered successfully");
-                    alert("Процесс запущен. Ожидание обновлений...");
-                    // WebSocket will handle status updates automatically
-                })
-                .catch(err => {
-                    console.error("Error in Rescan Strategy 2:", err);
-                    alert("Не удалось определить документ для сканирования.");
-                    updateProcessingState(activeCategory, null);
-                });
-        }
-    };
-
-    const handleDelete = (itemId) => {
-        if (window.confirm("Вы уверены, что хотите удалить эту запись?")) {
-            axios.delete(`${config.manageApi}/v1/applicants/${id}/data/${activeCategory}/${itemId}`)
-                .then(() => {
-                    setActiveSubTab(0);
-                    fetchData(); // Refresh list
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("Ошибка при удалении");
-                });
-        }
-    };
+    const {
+        applicantName,
+        data, setData,
+        loading,
+        isEditing, setIsEditing,
+        activeSubTab, setActiveSubTab,
+        activeDocumentId, setActiveDocumentId,
+        documents,
+        personalDataDocType, setPersonalDataDocType,
+        processingStatus, progress,
+        uploadTypeDialogOpen, setUploadTypeDialogOpen,
+        pendingFile, setPendingFile,
+        evaluations, fetchEvaluations,
+        expertSlots,
+        currentUser,
+        handleSave,
+        handleDelete,
+        handleDeleteDocument,
+        uploadDocumentWithData,
+        confirmRescan,
+        fetchData,
+        fetchDocuments
+    } = useApplicantDetails(id, activeCategory);
 
     const handleDeleteApplicant = () => {
-        setDeleteDialogOpen(true);
+        if (window.confirm("Вы уверены, что хотите полностью удалить этого абитуриента?")) {
+            axios.delete(`${config.manageApi}/v1/applicants/${id}`)
+                .then(() => {
+                    alert("Абитуриент успешно удален");
+                    window.location.hash = programId ? `#/app/programs/${programId}/applicants` : "#/app/applicants";
+                })
+                .catch(err => {
+                    console.error("Error deleting applicant:", err);
+                    alert("Ошибка при удалении абитуриента");
+                });
+        }
     };
-
-    const confirmDeleteApplicant = () => {
-        axios.delete(`${config.manageApi}/v1/applicants/${id}`)
-            .then(() => {
-                alert("Абитуриент успешно удален");
-                setDeleteDialogOpen(false);
-                if (programId) {
-                    window.location.hash = `#/app/programs/${programId}/applicants`;
-                } else {
-                    window.location.hash = "#/app/applicants";
-                }
-            })
-            .catch(err => {
-                console.error("Error deleting applicant:", err);
-                alert("Ошибка при удалении абитуриента");
-                setDeleteDialogOpen(false);
-            });
-    };
-
-
-
-    const isDiplomaGroup = activeCategory === 'diploma' || activeCategory === 'transcript';
 
     return (
         <>
@@ -326,11 +79,7 @@ export default function ApplicantDetails() {
                 title={`Анализ абитуриента: ${applicantName}`}
                 dense
                 actions={
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleDeleteApplicant}
-                    >
+                    <Button variant="contained" color="error" onClick={handleDeleteApplicant}>
                         Удалить абитуриента
                     </Button>
                 }
@@ -341,8 +90,6 @@ export default function ApplicantDetails() {
                     onChange={(e, val) => setActiveMainTab(val)}
                     variant="scrollable"
                     scrollButtons="auto"
-                    textColor="primary"
-                    indicatorColor="secondary"
                 >
                     <Tab label="Информация" value="info" />
                     <Tab label="Оценки экспертов" value="evaluations" />
@@ -352,14 +99,34 @@ export default function ApplicantDetails() {
                 {/* Left Side: Document Viewer */}
                 <Grid item xs={6}>
                     <Paper elevation={3} style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                        <Box p={2} bgcolor="primary.main" color="white" display="flex" justifyContent="space-between" alignItems="center">
+                        <Box p={1.5} bgcolor="primary.main" color="white" display="flex" justifyContent="space-between" alignItems="center">
                             <Typography variant="h6">Оригинал документа</Typography>
+                            <Button 
+                                variant="contained" 
+                                color="secondary" 
+                                size="small"
+                                startIcon={<AddIcon />}
+                                onClick={() => {
+                                    const docExists = activeDocumentId && (documents || []).some(d => d.id === activeDocumentId);
+                                    if (docExists) {
+                                        handleDeleteDocument(activeDocumentId).then(() => {
+                                            const btn = document.getElementById('upload-document-button');
+                                            if (btn) btn.click();
+                                        }).catch(() => {}); // Do nothing on cancel/error
+                                    } else {
+                                        const btn = document.getElementById('upload-document-button');
+                                        if (btn) btn.click();
+                                    }
+                                }}
+                            >
+                                {activeDocumentId && (documents || []).some(d => d.id === activeDocumentId) ? "Заменить" : "Загрузить"}
+                            </Button>
                         </Box>
                         <iframe
-                            id="doc-viewer-iframe"
+                            key={activeDocumentId || activeCategory}
                             src={activeDocumentId
                                 ? `${config.manageApi}/v1/documents/${activeDocumentId}/view#view=FitV`
-                                : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory}#view=FitV`}
+                                : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory === 'personal_data' ? personalDataDocType : activeCategory}${activeCategory === 'personal_data' ? `&doc_type=${personalDataDocType}` : ''}#view=FitV`}
                             width="100%"
                             height="100%"
                             title="Document Viewer"
@@ -370,29 +137,146 @@ export default function ApplicantDetails() {
 
                 <Grid item xs={6}>
                     <Paper elevation={3} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-
                         {activeMainTab === 'info' ? (
                             <>
                                 <Box p={1} borderBottom={1} borderColor="divider">
-                                    <Tabs value={activeCategory === 'transcript' ? 'diploma' : activeCategory} onChange={(e, val) => setActiveCategory(val)} variant="scrollable" scrollButtons="auto">
-                                        <Tab label="Паспорт" value="passport" />
-                                        <Tab label="Диплом" value="diploma" />
-                                        <Tab label="Опыт работы" value="work" />
-                                        <Tab label="Рекомендации" value="recommendation" />
-                                        <Tab label="Достижения" value="achievement" />
-                                        <Tab label="Сертификат АЯ" value="language" />
+                                    <Tabs
+                                        value={
+                                            activeCategory === 'transcript' ? 'diploma' :
+                                                ['second_diploma', 'prof_development', 'certification'].includes(activeCategory) ? 'additional_edu' :
+                                                    activeCategory
+                                        }
+                                        onChange={(e, val) => setActiveCategory(val === 'additional_edu' ? 'prof_development' : val)}
+                                        variant="scrollable"
+                                        scrollButtons="auto"
+                                    >
+                                        <Tab label="Персональные данные" value="personal_data" />
+                                        <Tab label="Баз. образование" value="diploma" />
+                                        <Tab label="Доп. образование" value="additional_edu" />
+                                        <Tab label="Личные достижения" value="achievement" />
                                         <Tab label="Мотивация" value="motivation" />
+                                        <Tab label="Рекомендации" value="recommendation" />
+                                        <Tab label="Сертификат АЯ" value="language" />
                                     </Tabs>
                                 </Box>
+
                                 <Box p={3} flexGrow={1} overflow="auto">
+                                    {/* Sub-tabs Type Row (Categories like Passport/Resume or Diploma/Transcript) */}
+                                    {activeCategory === 'personal_data' && (
+                                        <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
+                                            <Typography variant="subtitle2" color="textSecondary" sx={{ mr: 2, whiteSpace: 'nowrap' }}>
+                                                Просмотр PDF:
+                                            </Typography>
+                                            <Tabs
+                                                value={personalDataDocType}
+                                                onChange={(e, val) => {
+                                                    setPersonalDataDocType(val);
+                                                    const safeDocs = documents || [];
+                                                    const doc = val === 'passport' ? safeDocs.find(d => d.file_type === 'passport') : safeDocs.find(d => d.file_type === 'resume');
+                                                    setActiveDocumentId(doc ? doc.id : null);
+                                                }}
+                                            >
+                                                <Tab label="Паспорт" value="passport" />
+                                                <Tab label="Резюме" value="resume" />
+                                            </Tabs>
+                                        </Box>
+                                    )}
+
+                                    {['diploma', 'transcript'].includes(activeCategory) && (
+                                        <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
+                                            <Typography variant="subtitle2" color="textSecondary" sx={{ mr: 2, whiteSpace: 'nowrap' }}>
+                                                Просмотр PDF:
+                                            </Typography>
+                                            <Tabs
+                                                value={activeDocumentId === (documents || []).find(d => d.file_type === 'transcript')?.id ? 'transcript' : 'diploma'}
+                                                onChange={(e, val) => {
+                                                    const safeDocs = documents || [];
+                                                    const doc = val === 'transcript' ? safeDocs.find(d => d.file_type === 'transcript') : safeDocs.find(d => d.file_type === 'diploma');
+                                                    if (doc) setActiveDocumentId(doc.id);
+                                                }}
+                                            >
+                                                <Tab label="Диплом" value="diploma" />
+                                                <Tab label="Приложение к диплому" value="transcript" />
+                                            </Tabs>
+                                        </Box>
+                                    )}
+
+                                    {['second_diploma', 'prof_development', 'certification'].includes(activeCategory) && (
+                                        <Box borderBottom={1} borderColor="divider" mb={2} display="flex" justifyContent="center">
+                                            <Tabs value={activeCategory} onChange={(e, val) => setActiveCategory(val)} centered>
+                                                <Tab label="Второй диплом" value="second_diploma" />
+                                                <Tab label="Проф. развитие" value="prof_development" />
+                                                <Tab label="Сертификация" value="certification" />
+                                            </Tabs>
+                                        </Box>
+                                    )}
+
+                                    {/* Record-level Tabs Row (for categories with multiple entries) */}
+                                    {['prof_development', 'second_diploma', 'certification', 'achievement', 'recommendation'].includes(activeCategory) && (
+                                        <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
+                                            <Typography variant="subtitle2" color="textSecondary" sx={{ mr: 2, whiteSpace: 'nowrap' }}>
+                                                Просмотр PDF:
+                                            </Typography>
+                                            <Tabs
+                                                value={activeSubTab}
+                                                onChange={(e, val) => {
+                                                    if (val === 'add') {
+                                                        const btn = document.getElementById('upload-document-button');
+                                                        if (btn) btn.click();
+                                                    } else {
+                                                        setActiveSubTab(val);
+                                                        if (Array.isArray(data) && data[val] && data[val].document_id) {
+                                                            setActiveDocumentId(data[val].document_id);
+                                                        }
+                                                    }
+                                                }}
+                                                variant="scrollable"
+                                                scrollButtons="auto"
+                                            >
+                                                {(Array.isArray(data) ? data : []).map((item, index) => (
+                                                    <Tab key={index} label={
+                                                        <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', position: 'relative', paddingRight: '20px' }}>
+                                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                {activeCategory === 'achievement' ? `Достижение` :
+                                                                    activeCategory === 'recommendation' ? `Рекомендация` :
+                                                                        activeCategory === 'prof_development' ? 'Развитие' :
+                                                                            activeCategory === 'second_diploma' ? 'Диплом' :
+                                                                                activeCategory === 'certification' ? 'Сертификат' : 'Запись'}
+                                                                {` #${index + 1}`}
+                                                            </span>
+                                                            {item.record_type && (['prof_development', 'second_diploma', 'certification'].includes(activeCategory)) && (
+                                                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                                                    {item.record_type === 'work' ? 'Работа' :
+                                                                        item.record_type === 'internship' ? 'Стажировка' :
+                                                                            item.record_type === 'training' ? 'Повышение квалификац.' : item.record_type}
+                                                                </span>
+                                                            )}
+                                                            {activeSubTab === index && (
+                                                                <IconButton
+                                                                    size="small"
+                                                                    component="span"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDelete(item.id);
+                                                                    }}
+                                                                    style={{ position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)', padding: 2 }}
+                                                                >
+                                                                    <CloseIcon fontSize="small" />
+                                                                </IconButton>
+                                                            )}
+                                                        </div>
+                                                    } value={index} />
+                                                ))}
+                                                <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />
+                                            </Tabs>
+                                        </Box>
+                                    )}
+
                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                                         <Typography color="textSecondary" variant="caption">
                                             Источник: {(() => {
                                                 const currentData = Array.isArray(data) ? data[activeSubTab] : data;
-                                                const source = currentData?.source || (activeCategory === 'transcript' ? "" : "ИИ");
-                                                if (!source) return "-";
-                                                if (source === "model" || source === "ИИ") return "ИИ";
-                                                return source; // Already formatted as "role (name)" from backend
+                                                return currentData?.source || (activeCategory === 'transcript' ? "" : "ИИ");
                                             })()}
                                         </Typography>
                                         <Tooltip title={viewMode === "json" ? "Показать форму" : "Посмотреть JSON"}>
@@ -402,846 +286,177 @@ export default function ApplicantDetails() {
                                         </Tooltip>
                                     </Box>
 
-
-
-                                    {/* PROGRESS BAR */}
                                     {processingStatus && (
                                         <Box mt={2} mb={4} p={2} component={Paper} variant="outlined" style={{ backgroundColor: '#fafafa' }}>
                                             <Box display="flex" justifyContent="space-between" mb={1}>
-                                                {[
-                                                    { label: "Загрузка", min: 0, max: 15 },
-                                                    { label: "Подготовка", min: 15, max: 30 },
-                                                    { label: "ИИ анализ (1-2 мин)", min: 30, max: 90 },
-                                                    { label: "Завершение", min: 90, max: 100 }
-                                                ].map((stage, idx) => {
-                                                    const isActive = progress >= stage.min && (progress < stage.max || (stage.max === 100 && progress === 100));
-                                                    const isDone = progress >= stage.max;
-                                                    return (
-                                                        <Typography
-                                                            key={idx}
-                                                            variant="caption"
-                                                            style={{
-                                                                fontWeight: isActive ? 700 : 400,
-                                                                color: isActive ? theme.palette.primary.main : isDone ? theme.palette.success.main : '#999',
-                                                                transition: 'all 0.3s'
-                                                            }}
-                                                        >
-                                                            {stage.label}
-                                                        </Typography>
-                                                    );
-                                                })}
+                                                {["Загрузка", "Подготовка", "ИИ анализ (1-2 мин)", "Завершение"].map((label, idx) => (
+                                                    <Typography key={idx} variant="caption" style={{ fontWeight: progress >= (idx * 25) ? 700 : 400 }}>
+                                                        {label}
+                                                    </Typography>
+                                                ))}
                                             </Box>
-                                            <Box display="flex" alignItems="center">
-                                                <Box width="100%" mr={1}>
-                                                    <LinearProgress
-                                                        variant="determinate"
-                                                        value={progress}
-                                                        color={processingStatus === 'completed' ? 'success' : 'primary'}
-                                                    />
-                                                </Box>
-                                                <Box minWidth={35}>
-                                                    <Typography variant="body2" color="textSecondary">{`${Math.round(progress)}%`}</Typography>
-                                                </Box>
-                                            </Box>
+                                            <LinearProgress variant="determinate" value={progress} color={processingStatus === 'completed' ? 'success' : 'primary'} />
                                         </Box>
                                     )}
 
-                                    {/* JSON VIEW MODE */}
-                                    {viewMode === "json" ? (
-                                        <Box mt={2}>
-                                            <Paper variant="outlined" style={{ padding: 16, backgroundColor: '#f5f5f5', overflow: 'auto', position: 'relative' }}>
-                                                <Button 
-                                                    size="small" 
-                                                    style={{ position: 'absolute', top: 8, right: 8 }}
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-                                                        alert("JSON скопирован");
-                                                    }}
-                                                >
-                                                    Копировать
-                                                </Button>
-                                                <pre style={{ margin: 0, fontSize: '12px' }}>
-                                                    {JSON.stringify(data, null, 2)}
-                                                </pre>
-                                            </Paper>
-                                        </Box>
+                                    {loading ? (
+                                        <Typography>Загрузка данных...</Typography>
+                                    ) : viewMode === "json" ? (
+                                        <pre style={{ backgroundColor: '#f5f5f5', padding: 10, borderRadius: 4, overflow: 'auto' }}>
+                                            {JSON.stringify(data, null, 2)}
+                                        </pre>
                                     ) : (
                                         <>
-                                            {/* EXPERT EVALUATION FORM (INJECTED IN INFO TAB) */}
-                                            {data && !loading && (
-                                                <ExpertScoreSection 
-                                                    key={activeCategory}
-                                                    applicantId={id}
-                                                    category={activeCategory}
-                                                    currentUser={currentUser}
-                                                    expertSlots={expertSlots}
-                                                    evaluations={evaluations}
-                                                    onSaved={fetchEvaluations}
+                                            {activeCategory === "personal_data" && (
+                                                <PersonalDataSection
+                                                    data={data} setData={setData} isEditing={isEditing}
+                                                    documents={documents}
+                                                    personalDataDocType={personalDataDocType}
+                                                    setPersonalDataDocType={setPersonalDataDocType}
+                                                    setActiveDocumentId={setActiveDocumentId}
+                                                    handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {["diploma", "transcript"].includes(activeCategory) && (
+                                                <EducationSection
+                                                    activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
+                                                    documents={documents}
+                                                    activeDocumentId={activeDocumentId}
+                                                    setActiveDocumentId={setActiveDocumentId}
+                                                    handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {["prof_development", "second_diploma", "certification"].includes(activeCategory) && (
+                                                <AdditionalEducationSection
+                                                    activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
+                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                    setActiveDocumentId={setActiveDocumentId}
+                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {activeCategory === "achievement" && (
+                                                <AchievementsSection
+                                                    data={data} setData={setData} isEditing={isEditing}
+                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                    setActiveDocumentId={setActiveDocumentId}
+                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {activeCategory === "recommendation" && (
+                                                <RecommendationSection
+                                                    data={data} setData={setData} isEditing={isEditing}
+                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                    setActiveDocumentId={setActiveDocumentId}
+                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {activeCategory === "motivation" && (
+                                                <MotivationSection
+                                                    data={data} setData={setData} isEditing={isEditing}
+                                                    setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
+                                                />
+                                            )}
+                                            {activeCategory === "language" && (
+                                                <LanguageSection
+                                                    data={data} setData={setData} isEditing={isEditing}
+                                                    setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
                                                 />
                                             )}
 
-                                    {/* GENERIC LOADING/EMPTY STATE */}
-                                    {loading && <Typography mt={4}>Загрузка данных...</Typography>}
-                                    {!data && !loading && activeCategory !== 'work' && activeCategory !== 'recommendation' && activeCategory !== 'achievement' && activeCategory !== 'language' && activeCategory !== 'motivation' && (
-                                        <Box mt={4}>
-                                            <Typography color="error">Данные для этой категории еще не извлечены.</Typography>
-                                        </Box>
-                                    )}
-                                    {(!data || data.length === 0) && !loading && (activeCategory === 'work' || activeCategory === 'recommendation' || activeCategory === 'achievement') && (
-                                        <Box mt={4}>
-                                            <Typography color="textSecondary">Нет записей. Загрузите документ для добавления.</Typography>
-                                        </Box>
-                                    )}
-
-                                    {/* PASSPORT */}
-                                    {activeCategory === "passport" && data && (
-                                        <Box mt={4}>
-                                            <Grid container spacing={2}>
-                                                <Grid item xs={4}>
-                                                    <TextField disabled={!isEditing} label="Имя" fullWidth variant="outlined" size="small"
-                                                        value={data.name || ""} onChange={e => setData({ ...data, name: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={4}>
-                                                    <TextField disabled={!isEditing} label="Фамилия" fullWidth variant="outlined" size="small"
-                                                        value={data.surname || ""} onChange={e => setData({ ...data, surname: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={4}>
-                                                    <TextField disabled={!isEditing} label="Отчество*" fullWidth variant="outlined" size="small"
-                                                        value={data.patronymic || ""} onChange={e => setData({ ...data, patronymic: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Номер документа" fullWidth variant="outlined" size="small"
-                                                        value={data.document_number || ""} onChange={e => setData({ ...data, document_number: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Гражданство" fullWidth variant="outlined" size="small"
-                                                        value={data.nationality || ""} onChange={e => setData({ ...data, nationality: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Дата рождения" fullWidth variant="outlined" size="small"
-                                                        value={data.date_of_birth ? new Date(data.date_of_birth).toLocaleDateString('ru-RU') : ""}
-                                                        onChange={e => setData({ ...data, date_of_birth: e.target.value })} />
-                                                </Grid>
-                                            </Grid>
-                                        </Box>
-                                    )}
-
-                                    {/* DIPLOMA & TRANSCRIPT (Merged Group) */}
-                                    {isDiplomaGroup && (
-                                        <Box mt={2}>
-                                            {/* Sub-Switch for Diploma/Transcript */}
-                                            <Box display="flex" justifyContent="center" mb={2}>
-                                                <Button
-                                                    variant={activeCategory === 'diploma' ? 'contained' : 'outlined'}
-                                                    onClick={() => setActiveCategory('diploma')}
-                                                    style={{ marginRight: 10 }}
-                                                >
-                                                    Основное
-                                                </Button>
-                                                <Button
-                                                    variant={activeCategory === 'transcript' ? 'contained' : 'outlined'}
-                                                    onClick={() => setActiveCategory('transcript')}
-                                                >
-                                                    Выписка
-                                                </Button>
-                                            </Box>
-
-                                            {activeCategory === 'diploma' && data && (
-                                                <Grid container spacing={2}>
-                                                    <Grid item xs={12}>
-                                                        <TextField disabled={!isEditing} label="Учебное заведение" fullWidth variant="outlined" size="small"
-                                                            value={data.institution_name || ""} onChange={e => setData({ ...data, institution_name: e.target.value })} />
-                                                    </Grid>
-                                                    <Grid item xs={6}>
-                                                        <TextField disabled={!isEditing} label="Степень" fullWidth variant="outlined" size="small"
-                                                            value={data.degree_title || ""} onChange={e => setData({ ...data, degree_title: e.target.value })} />
-                                                    </Grid>
-                                                    <Grid item xs={6}>
-                                                        <TextField disabled={!isEditing} label="Специальность" fullWidth variant="outlined" size="small"
-                                                            value={data.major || ""} onChange={e => setData({ ...data, major: e.target.value })} />
-                                                    </Grid>
-                                                    <Grid item xs={6}>
-                                                        <TextField disabled={!isEditing} label="Номер диплома" fullWidth variant="outlined" size="small"
-                                                            value={data.diploma_serial_number || ""} onChange={e => setData({ ...data, diploma_serial_number: e.target.value })} />
-                                                    </Grid>
-                                                </Grid>
-                                            )}
-
-                                            {activeCategory === "transcript" && data && (
-                                                <Box mt={2}>
-                                                    <Typography variant="h6" gutterBottom>Аналитика успеваемости (Выписка)</Typography>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="CGPA" fullWidth variant="outlined" size="small"
-                                                                value={data.cumulative_gpa || ""} onChange={e => setData({ ...data, cumulative_gpa: e.target.value })}
-                                                                type="number" inputProps={{ step: "0.01" }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Итоговая оценка (A, A+, B...)" fullWidth variant="outlined" size="small"
-                                                                value={data.cumulative_grade || ""} onChange={e => setData({ ...data, cumulative_grade: e.target.value })} />
-                                                        </Grid>
-                                                        <Grid item xs={4}>
-                                                            <TextField disabled={!isEditing} label="Максимум кредитов" fullWidth variant="outlined" size="small"
-                                                                value={data.total_credits || ""} onChange={e => setData({ ...data, total_credits: e.target.value })}
-                                                                type="number" inputProps={{ step: "0.1" }} />
-                                                        </Grid>
-                                                        <Grid item xs={4}>
-                                                            <TextField disabled={!isEditing} label="Полученные кредиты" fullWidth variant="outlined" size="small"
-                                                                value={data.obtained_credits || ""} onChange={e => setData({ ...data, obtained_credits: e.target.value })}
-                                                                type="number" inputProps={{ step: "0.1" }} />
-                                                        </Grid>
-                                                        <Grid item xs={4}>
-                                                            <TextField disabled={!isEditing} label="Всего семестров" fullWidth variant="outlined" size="small"
-                                                                value={data.total_semesters || ""} onChange={e => setData({ ...data, total_semesters: e.target.value })}
-                                                                type="number" />
-                                                        </Grid>
-                                                    </Grid>
-                                                </Box>
-                                            )}
-                                        </Box>
-                                    )}
-
-
-                                    {/* WORK EXPERIENCE (TABS) */}
-                                    {activeCategory === "work" && (
-                                        <Box mt={2}>
-                                            <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
-                                                <Tabs
-                                                    value={activeSubTab}
-                                                    onChange={(e, val) => {
-                                                        if (val === 'add') {
-                                                            document.getElementById('upload-document-button').click();
-                                                        } else {
-                                                            setActiveSubTab(val);
-                                                            if (data[val] && data[val].document_id) {
-                                                                setActiveDocumentId(data[val].document_id);
-                                                            }
-                                                        }
-                                                    }}
-                                                    variant="scrollable"
-                                                    scrollButtons="auto"
-                                                    style={{ minHeight: '48px' }}
-                                                >
-                                                    {Array.isArray(data) && data.map((item, index) => (
-                                                        <Tab key={index} label={
-                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                                {`Место работы #${index + 1}`}
-                                                                {activeSubTab === index && (
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        component="span"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDelete(item.id);
-                                                                        }}
-                                                                        style={{ marginLeft: 8, padding: 2 }}
-                                                                    >
-                                                                        <CloseIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                )}
-                                                            </div>
-                                                        } value={index} />
-                                                    ))}
-                                                    <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />
-                                                </Tabs>
-                                            </Box>
-
-                                            {Array.isArray(data) && data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
-                                                <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
-                                                    <Box display="flex" justifyContent="space-between" mb={1}>
-                                                        <Typography variant="subtitle2" color="primary">Место работы #{activeSubTab + 1}</Typography>
-                                                        <div>
-                                                            {data[activeSubTab].document_id && (
-                                                                <Button size="small" variant="outlined" onClick={() => setActiveDocumentId(data[activeSubTab].document_id)} style={{ marginRight: 8 }}>
-                                                                    Оригинал
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </Box>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Компания" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].company_name || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].company_name = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Должность" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].position || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].position = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Город" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].city || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].city = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Страна" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].country || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].country = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                    </Grid>
-                                                </Paper>
-                                            )}
-                                        </Box>
-                                    )}
-
-                                    {/* RECOMMENDATIONS (TABS) */}
-                                    {activeCategory === "recommendation" && Array.isArray(data) && (
-                                        <Box mt={2}>
-                                            <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
-                                                <Tabs
-                                                    value={activeSubTab}
-                                                    onChange={(e, val) => {
-                                                        if (val === 'add') {
-                                                            document.getElementById('upload-document-button').click();
-                                                        } else {
-                                                            setActiveSubTab(val);
-                                                            if (data[val] && data[val].document_id) {
-                                                                setActiveDocumentId(data[val].document_id);
-                                                            }
-                                                        }
-                                                    }}
-                                                    variant="scrollable"
-                                                    scrollButtons="auto"
-                                                    style={{ minHeight: '48px' }}
-                                                >
-                                                    {data.map((item, index) => (
-                                                        <Tab key={index} label={
-                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                                {`Рекомендация #${index + 1}`}
-                                                                {activeSubTab === index && (
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        component="span"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDelete(item.id);
-                                                                        }}
-                                                                        style={{ marginLeft: 8, padding: 2 }}
-                                                                    >
-                                                                        <CloseIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                )}
-                                                            </div>
-                                                        } value={index} />
-                                                    ))}
-                                                    <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />
-                                                </Tabs>
-                                            </Box>
-
-                                            {data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
-                                                <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
-                                                    <Box display="flex" justifyContent="space-between" mb={1}>
-                                                        <Typography variant="subtitle2" color="primary">Рекомендация #{activeSubTab + 1}</Typography>
-                                                        <div>
-                                                            {data[activeSubTab].document_id && (
-                                                                <Button size="small" variant="outlined" onClick={() => setActiveDocumentId(data[activeSubTab].document_id)} style={{ marginRight: 8 }}>
-                                                                    Оригинал
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </Box>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Автор (Имя)" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].author_name || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].author_name = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Должность" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].author_position || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].author_position = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Организация" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].author_institution || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].author_institution = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Ключевые качества" fullWidth variant="outlined" size="small" multiline rows={2}
-                                                                value={data[activeSubTab].key_strengths || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].key_strengths = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                    </Grid>
-                                                </Paper>
-                                            )}
-                                        </Box>
-                                    )}
-
-                                    {/* ACHIEVEMENTS (TABS) */}
-                                    {activeCategory === "achievement" && Array.isArray(data) && (
-                                        <Box mt={2}>
-                                            <Box borderBottom={1} borderColor="divider" mb={2} display="flex" alignItems="center">
-                                                <Tabs
-                                                    value={activeSubTab}
-                                                    onChange={(e, val) => {
-                                                        if (val === 'add') {
-                                                            document.getElementById('upload-document-button').click();
-                                                        } else {
-                                                            setActiveSubTab(val);
-                                                            if (data[val] && data[val].document_id) {
-                                                                setActiveDocumentId(data[val].document_id);
-                                                            }
-                                                        }
-                                                    }}
-                                                    variant="scrollable"
-                                                    scrollButtons="auto"
-                                                    style={{ minHeight: '48px' }}
-                                                >
-                                                    {data.map((item, index) => (
-                                                        <Tab key={index} label={
-                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                                {`Достижение #${index + 1}`}
-                                                                {activeSubTab === index && (
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        component="span"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDelete(item.id);
-                                                                        }}
-                                                                        style={{ marginLeft: 8, padding: 2 }}
-                                                                    >
-                                                                        <CloseIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                )}
-                                                            </div>
-                                                        } value={index} />
-                                                    ))}
-                                                    <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />
-                                                </Tabs>
-                                            </Box>
-
-                                            {data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
-                                                <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
-                                                    <Box display="flex" justifyContent="space-between" mb={1}>
-                                                        <Typography variant="subtitle2" color="primary">Достижение #{activeSubTab + 1}</Typography>
-                                                        <div>
-                                                            {data[activeSubTab].document_id && (
-                                                                <Button size="small" variant="outlined" onClick={() => setActiveDocumentId(data[activeSubTab].document_id)} style={{ marginRight: 8 }}>
-                                                                    Оригинал
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </Box>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Тип достижения" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].achievement_type ? data[activeSubTab].achievement_type.charAt(0).toUpperCase() + data[activeSubTab].achievement_type.slice(1) : ""}
-                                                                onChange={e => {
-                                                                    const val = e.target.value;
-                                                                    const capitalized = val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].achievement_type = capitalized;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <TextField disabled={!isEditing} label="Наименование достижения" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].achievement_title || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].achievement_title = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Организация" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].company || ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    newData[activeSubTab].company = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
-                                                            <TextField disabled={!isEditing} label="Дата вручения" fullWidth variant="outlined" size="small"
-                                                                value={data[activeSubTab].date_received ? new Date(data[activeSubTab].date_received).toLocaleDateString('ru-RU') : ""}
-                                                                onChange={e => {
-                                                                    const newData = [...data];
-                                                                    // Ideally an ISO date picker, but keeping structure per existing layout
-                                                                    newData[activeSubTab].date_received = e.target.value;
-                                                                    setData(newData);
-                                                                }} />
-                                                        </Grid>
-                                                    </Grid>
-                                                </Paper>
-                                            )}
-                                        </Box>
-                                    )}
-
-                                    {/* LANGUAGE CERTIFICATE */}
-                                    {activeCategory === "language" && (
-                                        <Box mt={4}>
-                                            <Grid container spacing={2}>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Название экзамена" fullWidth variant="outlined" size="small"
-                                                        value={(data && data.exam_name) || ""} onChange={e => setData({ ...data, exam_name: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Баллы" fullWidth variant="outlined" size="small"
-                                                        value={(data && data.score) || ""} onChange={e => setData({ ...data, score: e.target.value })} />
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <TextField disabled={!isEditing} label="Уровень английского" fullWidth variant="outlined" size="small"
-                                                        value={(data && data.english_level) || ""} onChange={e => setData({ ...data, english_level: e.target.value })} />
-                                                </Grid>
-                                            </Grid>
-                                        </Box>
-                                    )}
-
-
-
-                                    {/* MOTIVATION */}
-                                    {activeCategory === "motivation" && (
-                                        <Box mt={4}>
-                                            <Grid container spacing={2}>
-                                                <Grid item xs={12}>
-                                                    <TextField disabled={!isEditing} label="Ключевые элементы" fullWidth variant="outlined" size="small" multiline rows={15}
-                                                        value={(data && data.main_text) || ""} onChange={e => setData({ ...data, main_text: e.target.value })} />
-                                                </Grid>
-                                            </Grid>
-                                        </Box>
-                                    )}
-
-
-
-                                    <Box mt={6} display="flex" justifyContent="flex-end" alignItems="center">
-                                        <Box flexGrow={1}>
-                                            <input
-                                                accept="application/pdf,image/*"
-                                                style={{ display: 'none' }}
-                                                id="upload-document-button"
-                                                type="file"
-                                                onChange={(e) => {
-                                                    if (e.target.files && e.target.files[0]) {
-                                                        const file = e.target.files[0];
-                                                        const formData = new FormData();
-                                                        formData.append('file', file);
-                                                        formData.append('category', activeCategory);
-
-                                                        updateProcessingState(activeCategory, 'processing', 0);
-
-                                                        axios.post(`${config.manageApi}/v1/applicants/${id}/documents`, formData, {
-                                                            headers: {
-                                                                'Content-Type': 'multipart/form-data'
-                                                            }
-                                                        })
-                                                            .then((res) => {
-                                                                alert("Документ загружен и поставлен в очередь.");
-                                                                console.log("Document uploaded to minio & rabbitmq:", res.data);
-                                                                // We don't fetch data yet. WebSocket will tell us when done.
-                                                            })
-                                                            .catch(err => {
-                                                                console.error(err);
-                                                                alert("Ошибка при загрузке документа");
-                                                                updateProcessingState(activeCategory, null);
-                                                            });
-                                                    }
-                                                }}
+                                            <ExpertScoreSection
+                                                applicantId={id} category={activeCategory}
+                                                currentUser={currentUser} expertSlots={expertSlots}
+                                                evaluations={evaluations} onSaved={fetchEvaluations}
                                             />
-                                            {/* For empty data views involving these multi-doc categories, we show the add button */}
-                                            {(!data || data.length === 0) && (activeCategory === 'work' || activeCategory === 'recommendation' || activeCategory === 'achievement') && (
-                                                <label htmlFor="upload-document-button">
-                                                    <Button variant="outlined" component="span" size="medium" style={{ marginRight: 10 }}>
-                                                        Загрузить первый документ
-                                                    </Button>
-                                                </label>
-                                            )}
+                                        </>
+                                    )}
+                                </Box>
 
-                                            {/* We hide the "Upload new document" general button for these categories since they have a "Add" tab now *unless* it's empty */}
-                                            {activeCategory !== 'work' && activeCategory !== 'recommendation' && activeCategory !== 'achievement' && (
-                                                <label htmlFor="upload-document-button">
-                                                    <Button variant="outlined" component="span" size="medium" style={{ marginRight: 10 }}>
-                                                        Загрузить новый документ
-                                                    </Button>
-                                                </label>
-                                            )}
-                                        </Box>
-                                        <Button variant="outlined" color="primary" onClick={handleRescan} style={{ marginRight: 10 }}>Повторить сканирование</Button>
-                                        {!isEditing ? (
-                                            <Button variant="contained" color="primary" onClick={() => setIsEditing(true)}>Изменить</Button>
+                                <Divider />
+                                <Box p={2} display="flex" justifyContent={(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing ? "space-between" : "flex-end"} alignItems="center">
+                                    {(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing && (
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={() => {
+                                                if (activeDocumentId) handleDeleteDocument(activeDocumentId);
+                                                else alert("Нет активного документа для удаления");
+                                            }}
+                                        >
+                                            Удалить документ и данные
+                                        </Button>
+                                    )}
+                                    <Box display="flex" gap={1}>
+                                        {isEditing ? (
+                                            <>
+                                                <Button onClick={() => setIsEditing(false)}>Отмена</Button>
+                                                <Button variant="contained" color="secondary" onClick={handleSave}>Сохранить</Button>
+                                            </>
                                         ) : (
                                             <>
-                                                <Button variant="outlined" color="secondary" onClick={() => setIsEditing(false)} style={{ marginRight: 10 }}>Отменить</Button>
-                                                <Button variant="contained" color="success" onClick={handleSave}>Сохранить</Button>
+                                                <Button variant="outlined" onClick={() => confirmRescan()}>Повторить сканирование</Button>
+                                                <Button variant="contained" color="primary" onClick={() => setIsEditing(true)}>Редактировать</Button>
                                             </>
                                         )}
                                     </Box>
-                                </>
-                            )}
-                            </Box>
-                        </>
+                                </Box>
+                            </>
                         ) : (
-                            <ExpertEvaluationsTab 
-                                evaluations={evaluations}
-                                expertSlots={expertSlots}
-                                currentUser={currentUser}
+                            <ExpertEvaluationsTab
+                                evaluations={evaluations} expertSlots={expertSlots}
                                 categories={[
-                                    { id: 'passport', label: 'Паспорт' },
-                                    { id: 'diploma', label: 'Диплом' },
-                                    { id: 'transcript', label: 'Транскрипт' },
-                                    { id: 'work', label: 'Опыт работы' },
+                                    { id: 'personal_data', label: 'Персональные данные' },
+                                    { id: 'diploma', label: 'Базовое образование' },
+                                    { id: 'achievement', label: 'Личные достижения' },
+                                    { id: 'prof_development', label: 'Проф. развитие' },
                                     { id: 'recommendation', label: 'Рекомендации' },
-                                    { id: 'achievement', label: 'Достижения' },
-                                    { id: 'language', label: 'Сертификат АЯ' },
-                                    { id: 'motivation', label: 'Мотивация' }
+                                    { id: 'motivation', label: 'Мотивация' },
+                                    { id: 'language', label: 'Сертификат АЯ' }
                                 ]}
+                                currentUser={currentUser}
                             />
                         )}
                     </Paper>
                 </Grid>
             </Grid>
 
-            {/* Confirmation Dialog for Deleting Applicant */}
-            <Dialog
-                open={deleteDialogOpen}
-                onClose={() => setDeleteDialogOpen(false)}
-            >
-                <DialogTitle>Удаление абитуриента</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Вы уверены, что хотите полностью удалить этого абитуриента из системы? Это действие необратимо и удалит все данные из базы данных и хранилища файлов.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteDialogOpen(false)}>Отмена</Button>
-                    <Button onClick={confirmDeleteApplicant} color="error" autoFocus variant="contained">
-                        Да, удалить
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* Hidden Input for Document Upload */}
+            <input
+                type="file"
+                id="upload-document-button"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        if (activeCategory === 'prof_development') {
+                            setPendingFile(file);
+                            setUploadTypeDialogOpen(true);
+                        } else if (activeCategory === 'personal_data') {
+                            // Use the currently selected tab (passport/resume) as the doc_type
+                            uploadDocumentWithData(file, personalDataDocType);
+                        } else {
+                            uploadDocumentWithData(file);
+                        }
+                    }
+                    // Reset input so searching for the same file again works
+                    e.target.value = '';
+                }}
+            />
 
-            {/* Confirmation Dialog for Rescan */}
-            <Dialog
-                open={rescanDialogOpen}
-                onClose={() => setRescanDialogOpen(false)}
-            >
-                <DialogTitle>Повторное сканирование</DialogTitle>
+            <Dialog open={uploadTypeDialogOpen} onClose={() => setUploadTypeDialogOpen(false)}>
+                <DialogTitle>Тип документа</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
-                        Запустить повторное извлечение данных документом через ИИ? Текущие извлеченные или ручные данные будут перезаписаны свежим результатом сканирования.
-                    </DialogContentText>
+                    <DialogContentText>Выберите тип записи для проф. развития:</DialogContentText>
+                    <Box mt={2} display="flex" flexDirection="column" gap={1}>
+                        <Button variant="outlined" onClick={() => { uploadDocumentWithData(pendingFile, 'work'); setUploadTypeDialogOpen(false); }}>Работа</Button>
+                        <Button variant="outlined" onClick={() => { uploadDocumentWithData(pendingFile, 'internship'); setUploadTypeDialogOpen(false); }}>Стажировка</Button>
+                        <Button variant="outlined" onClick={() => { uploadDocumentWithData(pendingFile, 'training'); setUploadTypeDialogOpen(false); }}>Повышение квалификации</Button>
+                    </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setRescanDialogOpen(false)}>Отмена</Button>
-                    <Button onClick={confirmRescan} color="primary" autoFocus variant="contained">
-                        Запустить
-                    </Button>
+                    <Button onClick={() => setUploadTypeDialogOpen(false)}>Отмена</Button>
                 </DialogActions>
             </Dialog>
         </>
-    );
-}
-
-// ----------------------------------------------------------------------
-// NEW COMPONENTS FOR EXPERT EVALUATION
-// ----------------------------------------------------------------------
-
-function ExpertScoreSection({ applicantId, category, currentUser, expertSlots, evaluations, onSaved }) {
-    const theme = useTheme();
-    
-    // Find if current user is an assigned expert
-    const mySlot = expertSlots.find(s => s.user_id === currentUser?.id);
-    const isAdmin = currentUser?.role === 'admin';
-    const isExpert = currentUser?.role === 'expert' || currentUser?.role === 'observer';
-    
-    // If not admin and not expert, don't show the form
-    if (!isAdmin && !isExpert) return null;
-
-    // We can show the scores of all experts for this category here too?
-    // Requirement says: "в каждой категории... выставить оценку... комментарии"
-    // So if I am Expert 1, I see my fields. If I am Admin, maybe I see all fields or specific override?
-    // Let's show a small form for "My Evaluation".
-    
-    const myEval = evaluations.find(e => e.category === category && e.expert_id === (mySlot ? mySlot.user_id : null));
-    // If admin is viewing, who do they edit? 
-    // Requirement: "администратор может изменить любую оценку"
-    // For now, let's keep it simple: if expert, they see their slot.
-    // If admin, maybe they see slots they want to override?
-    
-    return (
-        <Box mt={4} p={2} bgcolor="#f8f9fa" borderRadius={1} border={1} borderColor="divider">
-            <Typography variant="subtitle1" gutterBottom fontWeight="bold">Экспертная оценка категории</Typography>
-            
-            {!mySlot && (
-                <Typography variant="body2" color="textSecondary" mb={2}>
-                    {isAdmin 
-                        ? 'Эксперты еще не назначены. Перейдите во вкладку "Оценки экспертов", чтобы закрепить за системой экспертов.' 
-                        : 'Вы еще не назначены на роль эксперта для этого абитуриента. Попросите администратора добавить ваш ID в один из слотов экспертов.'}
-                </Typography>
-            )}
-
-            <Grid container spacing={2} alignItems="flex-end">
-                {expertSlots.map(slot => {
-                    const isMySlot = mySlot && mySlot.slot_number === slot.slot_number;
-                    const canEdit = isMySlot || isAdmin;
-                    const evalData = evaluations.find(e => e.category === category && e.expert_id === slot.user_id);
-                    
-                    return (
-                        <Grid item xs={12} key={slot.slot_number}>
-                            <Paper variant="outlined" style={{ padding: 12, borderLeft: `4px solid ${isMySlot ? theme.palette.primary.main : '#ccc'}` }}>
-                                <Typography variant="caption" color="textSecondary" display="block">
-                                    Эксперт {slot.slot_number}: {slot.user_name}
-                                </Typography>
-                                
-                                <Grid container spacing={1} mt={0.5}>
-                                    <Grid item xs={2}>
-                                        <TextField 
-                                            label="Оценка" 
-                                            type="number" 
-                                            size="small" 
-                                            fullWidth
-                                            disabled={!canEdit}
-                                            defaultValue={evalData?.score || 0}
-                                            onBlur={(e) => {
-                                                const val = parseInt(e.target.value);
-                                                if (val !== (evalData?.score || 0)) {
-                                                    saveEval(slot.user_id, val, evalData?.comment || "");
-                                                }
-                                            }}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={10}>
-                                        <TextField 
-                                            label="Комментарий эксперта" 
-                                            size="small" 
-                                            fullWidth
-                                            disabled={!canEdit}
-                                            defaultValue={evalData?.comment || ""}
-                                            onBlur={(e) => {
-                                                const val = e.target.value;
-                                                if (val !== (evalData?.comment || "")) {
-                                                    saveEval(slot.user_id, evalData?.score || 0, val);
-                                                }
-                                            }}
-                                        />
-                                    </Grid>
-                                </Grid>
-                                {evalData?.is_admin_override && (
-                                    <Typography variant="caption" color="error" style={{ fontStyle: 'italic', marginTop: 4, display: 'block' }}>
-                                        Переопределено: {evalData.source_info}
-                                    </Typography>
-                                )}
-                            </Paper>
-                        </Grid>
-                    );
-                })}
-            </Grid>
-        </Box>
-    );
-
-    function saveEval(targetExpertId, score, comment) {
-        axios.post(`${config.manageApi}/v1/applicants/${applicantId}/evaluations`, {
-            expert_id: targetExpertId,
-            category: category,
-            score: score,
-            comment: comment,
-            user_id: currentUser.id,
-            user_name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
-            user_role: currentUser.role
-        }).then(() => {
-            onSaved();
-        }).catch(err => {
-            console.error(err);
-            alert("Ошибка при сохранении оценки");
-        });
-    }
-}
-
-function ExpertEvaluationsTab({ evaluations, expertSlots, categories, currentUser }) {
-    return (
-        <Box p={3} flexGrow={1} overflow="auto">
-            <Typography variant="h5" gutterBottom>Сводная таблица оценок</Typography>
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 20 }}>
-                <thead>
-                    <tr style={{ backgroundColor: '#f5f5f5' }}>
-                        <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Категория</th>
-                        {[1, 2, 3].map(i => {
-                            const slot = expertSlots.find(s => s.slot_number === i);
-                            return (
-                                <th key={i} style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
-                                    Эксперт {i} {slot ? `(${slot.user_name})` : '(не назначен)'}
-                                </th>
-                            );
-                        })}
-                        <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Итого</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {categories.map(cat => {
-                        let total = 0;
-                        let count = 0;
-                        return (
-                            <tr key={cat.id}>
-                                <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>{cat.label}</td>
-                                {[1, 2, 3].map(i => {
-                                    const slot = expertSlots.find(s => s.slot_number === i);
-                                    const evalData = evaluations.find(e => e.category === cat.id && e.expert_id === slot?.user_id);
-                                    if (evalData) {
-                                        total += evalData.score;
-                                        count++;
-                                    }
-                                    return (
-                                        <td key={i} style={{ border: '1px solid #ddd', padding: '12px' }}>
-                                            {evalData ? (
-                                                <Box>
-                                                    <Typography variant="body1" fontWeight="bold" align="center">{evalData.score}</Typography>
-                                                    {evalData.comment && (
-                                                        <Typography variant="caption" color="textSecondary" style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: 150 }}>
-                                                            "{evalData.comment}"
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            ) : (
-                                                <Typography variant="body2" color="textSecondary" align="center">-</Typography>
-                                            )}
-                                        </td>
-                                    );
-                                })}
-                                <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', backgroundColor: '#fafafa' }}>
-                                    <Typography variant="h6">{count > 0 ? (total / count).toFixed(1) : '-'}</Typography>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-
-            {/* Admin Slot Management moved to User Management page */}
-        </Box>
     );
 }

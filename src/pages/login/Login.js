@@ -14,7 +14,7 @@ import { withRouter } from 'react-router-dom';
 import useStyles from './styles';
 
 // logo
-import logo from './logo.svg';
+import logo from './logo_HSE.svg';
 
 
 // context
@@ -93,7 +93,7 @@ function Login(props) {
       <div className={classes.logotypeContainer}>
         <img src={logo} alt='logo' className={classes.logotypeImage} />
         <Typography className={classes.logotypeText}>
-          Intellectual Portfolio Analysis
+          Intelligent analysis of system and software engineering portfolios
         </Typography>
       </div>
       <div
@@ -103,48 +103,58 @@ function Login(props) {
       >
         <div className={classes.form}>
           {isForgot ? (
-            <div>
-              <Input
-                id='password'
-                InputProps={{
-                  classes: {
-                    underline: classes.InputUnderline,
-                    input: classes.Input,
-                  },
-                }}
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                margin='normal'
-                placeholder='Email'
-                type='Email'
-                fullWidth
-              />
-              <div className={classes.formButtons}>
-                {isLoading ? (
-                  <CircularProgress size={26} className={classes.loginLoader} />
-                ) : (
+            <>
+              <div className={classes.topSection}>
+                <div className={classes.greetingWrapper}>
+                  <Typography variant='h1' className={classes.greeting}>
+                    Forgot Password
+                  </Typography>
+                </div>
+              </div>
+              <div className={classes.centerSection}>
+                <Input
+                  id='password'
+                  InputProps={{
+                    classes: {
+                      underline: classes.InputUnderline,
+                      input: classes.Input,
+                    },
+                  }}
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  margin='normal'
+                  placeholder='Email'
+                  type='Email'
+                  fullWidth
+                />
+                <div className={classes.formButtons}>
+                  {isLoading ? (
+                    <CircularProgress size={26} className={classes.loginLoader} />
+                  ) : (
+                    <Button
+                      disabled={forgotEmail.length === 0}
+                      onClick={() =>
+                        sendPasswordResetEmail(forgotEmail)(userDispatch)
+                      }
+                      variant='contained'
+                      color='primary'
+                      size='large'
+                    >
+                      Send
+                    </Button>
+                  )}
                   <Button
-                    disabled={forgotEmail.length === 0}
-                    onClick={() =>
-                      sendPasswordResetEmail(forgotEmail)(userDispatch)
-                    }
-                    variant='contained'
                     color='primary'
                     size='large'
+                    onClick={() => setIsForgot(!isForgot)}
+                    className={classes.forgetButton}
                   >
-                    Send
+                    Back to login
                   </Button>
-                )}
-                <Button
-                  color='primary'
-                  size='large'
-                  onClick={() => setIsForgot(!isForgot)}
-                  className={classes.forgetButton}
-                >
-                  Back to login
-                </Button>
+                </div>
               </div>
-            </div>
+              <div className={classes.bottomSection} />
+            </>
           ) : (
             <>
               <Tabs
@@ -158,202 +168,215 @@ function Login(props) {
               </Tabs>
               {activeTabId === 0 && (
                 <React.Fragment>
-                  {config.isBackend ? (
-                    <Widget
-                      disableWidgetMenu
-                      inheritHeight
-                      style={{ marginTop: 32 }}
-                    >
-                      <Typography
-                        variant={'body2'}
-                        component="div"
-                        style={{ textAlign: 'center' }}
+                  <div className={classes.topSection}>
+                    {config.isBackend ? (
+                      <Widget
+                        disableWidgetMenu
+                        inheritHeight
                       >
-                        This is a real app with Node.js backend - use
-                        <Typography variant={'body2'} weight={'bold'}>
-                          "admin@flatlogic.com / password"
-                        </Typography>{' '}
-                        to login!
+                        <Typography
+                          variant={'body2'}
+                          component="div"
+                          style={{ textAlign: 'center' }}
+                        >
+                          This is a real app with Node.js backend - use
+                          <Typography variant={'body2'} weight={'bold'}>
+                            "admin@flatlogic.com / password"
+                          </Typography>{' '}
+                          to login!
+                        </Typography>
+                      </Widget>
+                    ) : null}
+                    <div className={classes.greetingWrapper}>
+                      <Typography variant='h1' className={classes.greeting}>
+                        {getGreeting()}!
                       </Typography>
-                    </Widget>
-                  ) : null}
-                  <Typography variant='h1' className={classes.greeting}>
-                    {getGreeting()}, User
-                  </Typography>
-                  <Grow
-                    in={error}
-                    style={
-                      !error ? { display: 'none' } : { display: 'inline-block' }
-                    }
-                  >
-                    <Typography className={classes.errorMessage}>
-                      Something is wrong with your login or password :(
-                    </Typography>
-                  </Grow>
-                  <Input
-                    id='email'
-                    InputProps={{
-                      classes: {
-                        underline: classes.InputUnderline,
-                        input: classes.Input,
-                      },
-                    }}
-                    value={loginValue}
-                    onChange={(e) => setLoginValue(e.target.value)}
-                    margin='normal'
-                    placeholder='Email Adress'
-                    type='email'
-                    fullWidth
-                    onKeyDown={(e) => loginOnEnterKey(e)}
-                  />
-                  <Input
-                    id='password'
-                    InputProps={{
-                      classes: {
-                        underline: classes.InputUnderline,
-                        input: classes.Input,
-                      },
-                    }}
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
-                    margin='normal'
-                    placeholder='Password'
-                    type='password'
-                    fullWidth
-                    onKeyDown={(e) => loginOnEnterKey(e)}
-                  />
-                  <div className={classes.formButtons}>
-                    {isLoading ? (
-                      <CircularProgress
-                        size={26}
-                        className={classes.loginLoader}
-                      />
-                    ) : (
+                    </div>
+                  </div>
+                  <div className={classes.centerSection}>
+                    <Grow
+                      in={error}
+                      style={
+                        !error ? { display: 'none' } : { display: 'inline-block' }
+                      }
+                    >
+                      <Typography className={classes.errorMessage}>
+                        Something is wrong with your login or password :(
+                      </Typography>
+                    </Grow>
+                    <Input
+                      id='email'
+                      InputProps={{
+                        classes: {
+                          underline: classes.InputUnderline,
+                          input: classes.Input,
+                        },
+                      }}
+                      value={loginValue}
+                      onChange={(e) => setLoginValue(e.target.value)}
+                      margin='normal'
+                      placeholder='Email Adress'
+                      type='email'
+                      fullWidth
+                      onKeyDown={(e) => loginOnEnterKey(e)}
+                    />
+                    <Input
+                      id='password'
+                      InputProps={{
+                        classes: {
+                          underline: classes.InputUnderline,
+                          input: classes.Input,
+                        },
+                      }}
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      margin='normal'
+                      placeholder='Password'
+                      type='password'
+                      fullWidth
+                      onKeyDown={(e) => loginOnEnterKey(e)}
+                    />
+                    <div className={classes.formButtons}>
+                      {isLoading ? (
+                        <CircularProgress
+                          size={26}
+                          className={classes.loginLoader}
+                        />
+                      ) : (
+                        <Button
+                          disabled={!isLoginFormValid()}
+                          onClick={() =>
+                            loginUser(
+                              userDispatch,
+                              loginValue,
+                              passwordValue,
+                              props.history,
+                              setIsLoading,
+                              setError,
+                            )
+                          }
+                          variant='contained'
+                          color='primary'
+                          size='large'
+                        >
+                          Login
+                        </Button>
+                      )}
                       <Button
-                        disabled={!isLoginFormValid()}
-                        onClick={() =>
-                          loginUser(
-                            userDispatch,
-                            loginValue,
-                            passwordValue,
-                            props.history,
-                            setIsLoading,
-                            setError,
-                          )
-                        }
-                        variant='contained'
                         color='primary'
                         size='large'
+                        onClick={() => setIsForgot(!isForgot)}
+                        className={classes.forgetButton}
                       >
-                        Login
+                        Forgot Password?
                       </Button>
-                    )}
-                    <Button
-                      color='primary'
-                      size='large'
-                      onClick={() => setIsForgot(!isForgot)}
-                      className={classes.forgetButton}
-                    >
-                      Forgot Password?
-                    </Button>
+                    </div>
                   </div>
+                  <div className={classes.bottomSection} />
                 </React.Fragment>
               )}
               {activeTabId === 1 && (
                 <React.Fragment>
-                  <Typography variant='h1' className={classes.greeting}>
-                    Welcome!
-                  </Typography>
-                  <Typography variant='h2' className={classes.subGreeting}>
-                    Create your account
-                  </Typography>
-                  <Grow in={error}>
-                    <Typography className={classes.errorMessage}>
-                      Something is wrong with your login or password :(
-                    </Typography>
-                  </Grow>
-                  <Input
-                    id='name'
-                    InputProps={{
-                      classes: {
-                        underline: classes.InputUnderline,
-                        input: classes.Input,
-                      },
-                    }}
-                    value={nameValue}
-                    onChange={(e) => setNameValue(e.target.value)}
-                    margin='normal'
-                    placeholder='Full Name'
-                    type='email'
-                    fullWidth
-                  />
-                  <Input
-                    id='email'
-                    InputProps={{
-                      classes: {
-                        underline: classes.InputUnderline,
-                        input: classes.Input,
-                      },
-                    }}
-                    value={loginValue}
-                    onChange={(e) => setLoginValue(e.target.value)}
-                    margin='normal'
-                    placeholder='Email Adress'
-                    type='email'
-                    fullWidth
-                  />
-                  <Input
-                    id='password'
-                    InputProps={{
-                      classes: {
-                        underline: classes.InputUnderline,
-                        input: classes.Input,
-                      },
-                    }}
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
-                    margin='normal'
-                    placeholder='Password'
-                    type='password'
-                    fullWidth
-                  />
-                  <div className={classes.creatingButtonContainer}>
-                    {isLoading ? (
-                      <CircularProgress size={26} />
-                    ) : (
-                      <Button
-                        onClick={() =>
-                          registerUser(
-                            userDispatch,
-                            loginValue,
-                            passwordValue,
-                            props.history,
-                            setIsLoading,
-                            setError,
-                          )()
-                        }
-                        disabled={
-                          loginValue.length === 0 ||
-                          passwordValue.length === 0 ||
-                          nameValue.length === 0
-                        }
-                        size='large'
-                        variant='contained'
-                        color='primary'
-                        fullWidth
-                        className={classes.createAccountButton}
-                      >
+                  <div className={classes.topSection}>
+                    <div className={classes.greetingWrapper}>
+                      <Typography variant='h1' className={classes.greeting}>
+                        Welcome!
+                      </Typography>
+                      <Typography variant='h2' className={classes.subGreeting}>
                         Create your account
-                      </Button>
-                    )}
+                      </Typography>
+                    </div>
                   </div>
+                  <div className={classes.centerSection}>
+                    <Grow in={error}>
+                      <Typography className={classes.errorMessage}>
+                        Something is wrong with your login or password :(
+                      </Typography>
+                    </Grow>
+                    <Input
+                      id='name'
+                      InputProps={{
+                        classes: {
+                          underline: classes.InputUnderline,
+                          input: classes.Input,
+                        },
+                      }}
+                      value={nameValue}
+                      onChange={(e) => setNameValue(e.target.value)}
+                      margin='normal'
+                      placeholder='Full Name'
+                      type='email'
+                      fullWidth
+                    />
+                    <Input
+                      id='email'
+                      InputProps={{
+                        classes: {
+                          underline: classes.InputUnderline,
+                          input: classes.Input,
+                        },
+                      }}
+                      value={loginValue}
+                      onChange={(e) => setLoginValue(e.target.value)}
+                      margin='normal'
+                      placeholder='Email Adress'
+                      type='email'
+                      fullWidth
+                    />
+                    <Input
+                      id='password'
+                      InputProps={{
+                        classes: {
+                          underline: classes.InputUnderline,
+                          input: classes.Input,
+                        },
+                      }}
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      margin='normal'
+                      placeholder='Password'
+                      type='password'
+                      fullWidth
+                    />
+                    <div className={classes.creatingButtonContainer}>
+                      {isLoading ? (
+                        <CircularProgress size={26} />
+                      ) : (
+                        <Button
+                          onClick={() =>
+                            registerUser(
+                              userDispatch,
+                              loginValue,
+                              passwordValue,
+                              props.history,
+                              setIsLoading,
+                              setError,
+                            )()
+                          }
+                          disabled={
+                            loginValue.length === 0 ||
+                            passwordValue.length === 0 ||
+                            nameValue.length === 0
+                          }
+                          size='large'
+                          variant='contained'
+                          color='primary'
+                          fullWidth
+                          className={classes.createAccountButton}
+                        >
+                          Create your account
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className={classes.bottomSection} />
 
                 </React.Fragment>
               )}
             </>
           )}
         </div>
-        <Typography color='primary' className={classes.copyright}>
+        {/* <Typography color='primary' className={classes.copyright}>
           2014-{new Date().getFullYear()}{' '}
           <a
             style={{ textDecoration: 'none', color: 'inherit' }}
@@ -364,7 +387,7 @@ function Login(props) {
             Flatlogic
           </a>
           , LLC. All rights reserved.
-        </Typography>
+        </Typography> */}
       </div>
     </Grid >
   );

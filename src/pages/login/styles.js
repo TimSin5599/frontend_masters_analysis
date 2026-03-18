@@ -67,6 +67,40 @@ export default makeStyles((theme) => ({
   },
   form: {
     width: 320,
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+  },
+  loginFieldsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+  },
+  topSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+  },
+  centerSection: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  bottomSection: {
+    flex: 1,
+  },
+  greetingWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  registrationFieldsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    flex: 1,
+    marginTop: theme.spacing(2),
   },
   tab: {
     fontWeight: 400,
