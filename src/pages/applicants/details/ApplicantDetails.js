@@ -1,11 +1,11 @@
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import CodeIcon from '@mui/icons-material/Code';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Grid, IconButton, LinearProgress, Paper, Tab, Tabs, Tooltip, Typography } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import PendingIcon from '@mui/icons-material/Pending';
+import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Grid, IconButton, LinearProgress, Paper, Snackbar, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import axios from "axios";
 import { useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useHistory, useLocation, useParams } from "react-router-dom";
 import config from "../../../config";
 
 // components
@@ -18,14 +18,17 @@ import LanguageSection from "./components/LanguageSection";
 import MotivationSection from "./components/MotivationSection";
 import PersonalDataSection from "./components/PersonalDataSection";
 import RecommendationSection from "./components/RecommendationSection";
+import VideoSection from "./components/VideoSection";
+import DocumentsSection from "./components/DocumentsSection";
 
 // hook
 import { useApplicantDetails } from "./hooks/useApplicantDetails";
+import { getToken } from "../../../utils/tokenManager";
 
 export default function ApplicantDetails() {
-    const theme = useTheme();
     const { id } = useParams();
     const location = useLocation();
+    const history = useHistory();
 
     // Parse query params to find program_id if available
     const queryParams = new URLSearchParams(location.search);
@@ -55,9 +58,71 @@ export default function ApplicantDetails() {
         handleDeleteDocument,
         uploadDocumentWithData,
         confirmRescan,
-        fetchData,
-        fetchDocuments
-    } = useApplicantDetails(id, activeCategory);
+        criteria,
+        allExperts,
+        fetchExpertSlots,
+        applicantStatus,
+        transferToExperts,
+        handleSaveCategory,
+        notification, setNotification,
+        scoringScheme,
+        updateScoringScheme,
+    } = useApplicantDetails(id, activeCategory, programId);
+
+    const statusMap = {
+        "uploaded": { label: "Создан", color: "default" },
+        "processing": { label: "Анализ", color: "info" },
+        "verifying": { label: "Проверка", color: "warning" },
+        "assessed": { label: "Оценивание", color: "secondary" },
+        "completed": { label: "Оценено", color: "success" }
+    };
+
+    const currentStatus = statusMap[applicantStatus] || { label: applicantStatus, color: 'default' };
+
+    const categoryToCriteriaCodes = {
+        'diploma': ['EDU_BASE'],
+        'transcript': ['EDU_BASE'],
+        'prof_development': ['EDU_ADD', 'ADD_ACHIEV_COMBINED'],
+        'second_diploma': ['EDU_ADD', 'ADD_ACHIEV_COMBINED'],
+        'certification': ['EDU_ADD', 'ADD_ACHIEV_COMBINED'],
+        'achievement': ['ACHIEVEMENTS', 'IEEE_INT', 'ADD_ACHIEV_COMBINED'],
+        'recommendation': ['RECOMMENDATION'],
+        'motivation': ['MOTIVATION'],
+        'language': ['ENGLISH'],
+        'video_presentation': ['VIDEO']
+    };
+
+    const potentialCodes = categoryToCriteriaCodes[activeCategory] || [];
+    const matchedCriteria = (criteria || []).find(c => potentialCodes.includes(c.code));
+
+    const categoryDocTypes = {
+        'personal_data': ['passport', 'resume'],
+        'diploma': ['diploma', 'transcript'],
+        'additional_edu': ['second_diploma', 'prof_development', 'certification'],
+        'achievement': ['achievement'],
+        'motivation': ['motivation'],
+        'recommendation': ['recommendation'],
+        'language': ['language'],
+        'video_presentation': ['video_presentation'],
+    };
+
+    const IN_FLIGHT_STATUSES = new Set(['pending', 'classifying', 'classified', 'extracting', 'processing']);
+    const ERROR_STATUSES = new Set(['classification_failed', 'extraction_failed', 'failed']);
+
+    const isProcessingCategory = (catKey) => {
+        const types = categoryDocTypes[catKey] || [];
+        return (documents || []).some(d => types.includes(d.file_type) && IN_FLIGHT_STATUSES.has(d.status));
+    };
+
+    const isErrorCategory = (catKey) => {
+        const types = categoryDocTypes[catKey] || [];
+        return (documents || []).some(d => types.includes(d.file_type) && ERROR_STATUSES.has(d.status));
+    };
+
+    const activeCatKey = ['second_diploma', 'prof_development', 'certification'].includes(activeCategory)
+        ? 'additional_edu'
+        : activeCategory;
+    const activeCategoryIsProcessing = isProcessingCategory(activeCatKey);
 
     const handleDeleteApplicant = () => {
         if (window.confirm("Вы уверены, что хотите полностью удалить этого абитуриента?")) {
@@ -79,9 +144,23 @@ export default function ApplicantDetails() {
                 title={`Анализ абитуриента: ${applicantName}`}
                 dense
                 actions={
-                    <Button variant="contained" color="error" onClick={handleDeleteApplicant}>
-                        Удалить абитуриента
-                    </Button>
+                    <Box display="flex" gap={1} alignItems="center">
+                        <Chip 
+                            label={currentStatus.label} 
+                            color={currentStatus.color} 
+                            sx={{ fontWeight: 'bold', mr: 2 }} 
+                        />
+                        
+                        {applicantStatus === 'verifying' && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+                            <Button variant="contained" color="success" onClick={transferToExperts}>
+                                Передать экспертам
+                            </Button>
+                        )}
+
+                        <Button variant="contained" color="error" onClick={handleDeleteApplicant}>
+                            Удалить абитуриента
+                        </Button>
+                    </Box>
                 }
             />
             <Box mb={1} borderBottom={1} borderColor="divider">
@@ -92,52 +171,49 @@ export default function ApplicantDetails() {
                     scrollButtons="auto"
                 >
                     <Tab label="Информация" value="info" />
-                    <Tab label="Оценки экспертов" value="evaluations" />
+                    <Tab
+                        label={
+                            (documents || []).some(d => d.status === 'classification_failed' || d.file_type === 'unknown')
+                            ? <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>Документы ⚠</span>
+                            : (documents || []).some(d => ERROR_STATUSES.has(d.status))
+                            ? <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>Документы ✗</span>
+                            : (documents || []).some(d => IN_FLIGHT_STATUSES.has(d.status))
+                            ? <span style={{ color: '#f57f17', fontWeight: 'bold' }}>Документы ●</span>
+                            : "Документы"
+                        }
+                        value="unknown"
+                    />
+                    {expertSlots.some(s => String(s.user_id) === String(currentUser?.id || currentUser?._id)) && (
+                        <Tab label="Оценка эксперта" value="evaluation_form" />
+                    )}
+                    <Tab label="Сводная таблица" value="evaluation_summary" />
                 </Tabs>
             </Box>
             <Grid container spacing={2} style={{ height: "calc(100vh - 200px)" }}>
-                {/* Left Side: Document Viewer */}
-                <Grid item xs={6}>
-                    <Paper elevation={3} style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                        <Box p={1.5} bgcolor="primary.main" color="white" display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography variant="h6">Оригинал документа</Typography>
-                            <Button 
-                                variant="contained" 
-                                color="secondary" 
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => {
-                                    const docExists = activeDocumentId && (documents || []).some(d => d.id === activeDocumentId);
-                                    if (docExists) {
-                                        handleDeleteDocument(activeDocumentId).then(() => {
-                                            const btn = document.getElementById('upload-document-button');
-                                            if (btn) btn.click();
-                                        }).catch(() => {}); // Do nothing on cancel/error
-                                    } else {
-                                        const btn = document.getElementById('upload-document-button');
-                                        if (btn) btn.click();
-                                    }
-                                }}
-                            >
-                                {activeDocumentId && (documents || []).some(d => d.id === activeDocumentId) ? "Заменить" : "Загрузить"}
-                            </Button>
-                        </Box>
-                        <iframe
-                            key={activeDocumentId || activeCategory}
-                            src={activeDocumentId
-                                ? `${config.manageApi}/v1/documents/${activeDocumentId}/view#view=FitV`
-                                : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory === 'personal_data' ? personalDataDocType : activeCategory}${activeCategory === 'personal_data' ? `&doc_type=${personalDataDocType}` : ''}#view=FitV`}
-                            width="100%"
-                            height="100%"
-                            title="Document Viewer"
-                            style={{ border: "none", flexGrow: 1 }}
-                        />
-                    </Paper>
-                </Grid>
+                {/* Left Side: Document Viewer - Hidden when in evaluation tabs */}
+                {activeMainTab === 'info' && (
+                    <Grid item xs={6}>
+                        <Paper elevation={3} style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                            <Box p={1.5} bgcolor="primary.main" color="white">
+                                <Typography variant="h6">Оригинал документа</Typography>
+                            </Box>
+                            <iframe
+                                key={activeDocumentId || activeCategory}
+                                src={activeDocumentId
+                                    ? `${config.manageApi}/v1/documents/${activeDocumentId}/view?token=${getToken()}#view=FitV`
+                                    : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory === 'personal_data' ? personalDataDocType : activeCategory}${activeCategory === 'personal_data' ? `&doc_type=${personalDataDocType}` : ''}&token=${getToken()}#view=FitV`}
+                                width="100%"
+                                height="100%"
+                                title="Document Viewer"
+                                style={{ border: "none", flexGrow: 1 }}
+                            />
+                        </Paper>
+                    </Grid>
+                )}
 
-                <Grid item xs={6}>
-                    <Paper elevation={3} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                        {activeMainTab === 'info' ? (
+                <Grid item xs={activeMainTab === 'info' ? 6 : 12} sx={{ height: '100%' }}>
+                    <Paper elevation={3} style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                        {activeMainTab === 'info' && (
                             <>
                                 <Box p={1} borderBottom={1} borderColor="divider">
                                     <Tabs
@@ -150,13 +226,31 @@ export default function ApplicantDetails() {
                                         variant="scrollable"
                                         scrollButtons="auto"
                                     >
-                                        <Tab label="Персональные данные" value="personal_data" />
-                                        <Tab label="Баз. образование" value="diploma" />
-                                        <Tab label="Доп. образование" value="additional_edu" />
-                                        <Tab label="Личные достижения" value="achievement" />
-                                        <Tab label="Мотивация" value="motivation" />
-                                        <Tab label="Рекомендации" value="recommendation" />
-                                        <Tab label="Сертификат АЯ" value="language" />
+                                        {['personal_data', 'diploma', 'additional_edu', 'achievement', 'motivation', 'recommendation', 'video_presentation', 'language'].map((catKey) => {
+                                            const labels = {
+                                                personal_data: 'Персональные данные',
+                                                diploma: 'Баз. образование',
+                                                additional_edu: 'Доп. образование',
+                                                achievement: 'Личные достижения',
+                                                motivation: 'Мотивация',
+                                                recommendation: 'Рекомендации',
+                                                video_presentation: 'Вид. презентация',
+                                                language: 'Сертификат АЯ',
+                                            };
+                                            const proc = isProcessingCategory(catKey);
+                                            const err  = isErrorCategory(catKey);
+                                            return (
+                                                <Tab
+                                                    key={catKey}
+                                                    value={catKey}
+                                                    label={
+                                                        proc ? <span style={{ color: '#f57f17', fontWeight: 600 }}>{labels[catKey]} ●</span>
+                                                        : err  ? <span style={{ color: '#d32f2f', fontWeight: 600 }}>{labels[catKey]} ✗</span>
+                                                        : labels[catKey]
+                                                    }
+                                                />
+                                            );
+                                        })}
                                     </Tabs>
                                 </Box>
 
@@ -188,11 +282,12 @@ export default function ApplicantDetails() {
                                                 Просмотр PDF:
                                             </Typography>
                                             <Tabs
-                                                value={activeDocumentId === (documents || []).find(d => d.file_type === 'transcript')?.id ? 'transcript' : 'diploma'}
+                                                value={['diploma', 'transcript'].includes(activeCategory) ? activeCategory : 'diploma'}
                                                 onChange={(e, val) => {
+                                                    setActiveCategory(val);
                                                     const safeDocs = documents || [];
                                                     const doc = val === 'transcript' ? safeDocs.find(d => d.file_type === 'transcript') : safeDocs.find(d => d.file_type === 'diploma');
-                                                    if (doc) setActiveDocumentId(doc.id);
+                                                    setActiveDocumentId(doc ? doc.id : null);
                                                 }}
                                             >
                                                 <Tab label="Диплом" value="diploma" />
@@ -286,6 +381,41 @@ export default function ApplicantDetails() {
                                         </Tooltip>
                                     </Box>
 
+                                    {activeCategoryIsProcessing && !processingStatus && (
+                                        <Box mb={2} p={1.5} display="flex" alignItems="center" gap={1} sx={{ bgcolor: 'rgba(249,168,37,0.1)', border: '1px solid #f9a825', borderRadius: 1 }}>
+                                            <PendingIcon sx={{ color: '#f9a825', flexShrink: 0 }} />
+                                            <Typography variant="body2" sx={{ color: '#f57f17', fontWeight: 500 }}>
+                                                Документ находится в обработке ИИ — статус: <strong>Анализ</strong>. Данные появятся автоматически после завершения.
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {/* Banner: extraction failed — suggest manual input */}
+                                    {!activeCategoryIsProcessing && isErrorCategory(activeCatKey) && activeCategory !== 'unknown' && (
+                                        <Box mb={2} p={1.5} display="flex" alignItems="center" justifyContent="space-between" gap={1}
+                                            sx={{ bgcolor: 'rgba(211,47,47,0.06)', border: '1px solid rgba(211,47,47,0.35)', borderRadius: 1 }}>
+                                            <Typography variant="body2" sx={{ color: '#b71c1c', fontWeight: 500 }}>
+                                                ИИ не смог обработать документ. Вы можете ввести данные вручную — нажмите «Редактировать».
+                                            </Typography>
+                                            {!isEditing && (
+                                                <Button
+                                                    variant="contained"
+                                                    color="error"
+                                                    size="small"
+                                                    sx={{ flexShrink: 0 }}
+                                                    onClick={() => {
+                                                        if (!data || Object.keys(data).length === 0) {
+                                                            setData({});
+                                                        }
+                                                        setIsEditing(true);
+                                                    }}
+                                                >
+                                                    Редактировать
+                                                </Button>
+                                            )}
+                                        </Box>
+                                    )}
+
                                     {processingStatus && (
                                         <Box mt={2} mb={4} p={2} component={Paper} variant="outlined" style={{ backgroundColor: '#fafafa' }}>
                                             <Box display="flex" justifyContent="space-between" mb={1}>
@@ -301,7 +431,7 @@ export default function ApplicantDetails() {
 
                                     {loading ? (
                                         <Typography>Загрузка данных...</Typography>
-                                    ) : viewMode === "json" ? (
+                                    ) : viewMode === "json" && activeCategory !== "unknown" ? (
                                         <pre style={{ backgroundColor: '#f5f5f5', padding: 10, borderRadius: 4, overflow: 'auto' }}>
                                             {JSON.stringify(data, null, 2)}
                                         </pre>
@@ -315,59 +445,133 @@ export default function ApplicantDetails() {
                                                     setPersonalDataDocType={setPersonalDataDocType}
                                                     setActiveDocumentId={setActiveDocumentId}
                                                     handleDeleteDocument={handleDeleteDocument}
+                                                    handleSave={handleSave}
+                                                    currentUser={currentUser}
+                                                    applicantStatus={applicantStatus}
                                                 />
                                             )}
                                             {["diploma", "transcript"].includes(activeCategory) && (
-                                                <EducationSection
-                                                    activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
-                                                    documents={documents}
-                                                    activeDocumentId={activeDocumentId}
-                                                    setActiveDocumentId={setActiveDocumentId}
-                                                    handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <EducationSection
+                                                        activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
+                                                        documents={documents}
+                                                        activeDocumentId={activeDocumentId}
+                                                        setActiveDocumentId={setActiveDocumentId}
+                                                        handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
                                             {["prof_development", "second_diploma", "certification"].includes(activeCategory) && (
-                                                <AdditionalEducationSection
-                                                    activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
-                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
-                                                    setActiveDocumentId={setActiveDocumentId}
-                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <AdditionalEducationSection
+                                                        activeCategory={activeCategory} data={data} setData={setData} isEditing={isEditing}
+                                                        activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                        setActiveDocumentId={setActiveDocumentId}
+                                                        handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
                                             {activeCategory === "achievement" && (
-                                                <AchievementsSection
-                                                    data={data} setData={setData} isEditing={isEditing}
-                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
-                                                    setActiveDocumentId={setActiveDocumentId}
-                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <AchievementsSection
+                                                        data={data} setData={setData} isEditing={isEditing}
+                                                        activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                        setActiveDocumentId={setActiveDocumentId}
+                                                        handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
                                             {activeCategory === "recommendation" && (
-                                                <RecommendationSection
-                                                    data={data} setData={setData} isEditing={isEditing}
-                                                    activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
-                                                    setActiveDocumentId={setActiveDocumentId}
-                                                    handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <RecommendationSection
+                                                        data={data} setData={setData} isEditing={isEditing}
+                                                        activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}
+                                                        setActiveDocumentId={setActiveDocumentId}
+                                                        handleDelete={handleDelete} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
                                             {activeCategory === "motivation" && (
-                                                <MotivationSection
-                                                    data={data} setData={setData} isEditing={isEditing}
-                                                    setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <MotivationSection
+                                                        data={data} setData={setData} isEditing={isEditing}
+                                                        setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
                                             {activeCategory === "language" && (
-                                                <LanguageSection
-                                                    data={data} setData={setData} isEditing={isEditing}
-                                                    setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
-                                                />
+                                                <>
+                                                    <LanguageSection
+                                                        data={data} setData={setData} isEditing={isEditing}
+                                                        setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
+                                            )}
+                                            {activeCategory === "video_presentation" && (
+                                                <>
+                                                    <VideoSection
+                                                        data={data} setData={setData} isEditing={isEditing}
+                                                        setActiveDocumentId={setActiveDocumentId} handleDeleteDocument={handleDeleteDocument}
+                                                        handleSave={handleSave}
+                                                        currentUser={currentUser}
+                                                        applicantStatus={applicantStatus}
+                                                    />
+                                                    <ExpertScoreSection 
+                                                        applicantId={id} category={activeCategory} evaluations={evaluations} 
+                                                        expertSlots={expertSlots} currentUser={currentUser} 
+                                                        onRefreshEvaluations={fetchEvaluations} criteria={criteria}
+                                                    />
+                                                </>
                                             )}
 
-                                            <ExpertScoreSection
-                                                applicantId={id} category={activeCategory}
-                                                currentUser={currentUser} expertSlots={expertSlots}
-                                                evaluations={evaluations} onSaved={fetchEvaluations}
-                                            />
                                         </>
                                     )}
                                 </Box>
@@ -395,25 +599,59 @@ export default function ApplicantDetails() {
                                         ) : (
                                             <>
                                                 <Button variant="outlined" onClick={() => confirmRescan()}>Повторить сканирование</Button>
-                                                <Button variant="contained" color="primary" onClick={() => setIsEditing(true)}>Редактировать</Button>
+                                                {(currentUser?.role !== 'operator' || applicantStatus === 'verifying') && (
+                                                    <Button variant="contained" color="primary" onClick={() => setIsEditing(true)}>Редактировать</Button>
+                                                )}
                                             </>
                                         )}
                                     </Box>
                                 </Box>
                             </>
-                        ) : (
+                        )}
+
+                        {activeMainTab === 'unknown' && (
+                            <Box flexGrow={1} overflow="hidden" display="flex" sx={{ minHeight: 0 }}>
+                                <DocumentsSection
+                                    documents={documents}
+                                    handleSaveCategory={handleSaveCategory}
+                                    handleDeleteDocument={handleDeleteDocument}
+                                    confirmRescan={confirmRescan}
+                                    setActiveDocumentId={setActiveDocumentId}
+                                    getDocumentUrl={(docId) => `${config.manageApi}/v1/documents/${docId}/view?token=${getToken()}#view=FitV`}
+                                    onManualEntry={(docId) =>
+                                        history.push(`/app/applicants/${id}/documents/${docId}/manual-entry${programId ? `?program_id=${programId}` : ""}`)
+                                    }
+                                />
+                            </Box>
+                        )}
+
+                        {activeMainTab === 'evaluation_form' && (
                             <ExpertEvaluationsTab
-                                evaluations={evaluations} expertSlots={expertSlots}
-                                categories={[
-                                    { id: 'personal_data', label: 'Персональные данные' },
-                                    { id: 'diploma', label: 'Базовое образование' },
-                                    { id: 'achievement', label: 'Личные достижения' },
-                                    { id: 'prof_development', label: 'Проф. развитие' },
-                                    { id: 'recommendation', label: 'Рекомендации' },
-                                    { id: 'motivation', label: 'Мотивация' },
-                                    { id: 'language', label: 'Сертификат АЯ' }
-                                ]}
+                                applicantId={id}
+                                evaluations={evaluations}
+                                expertSlots={expertSlots}
+                                categories={criteria}
                                 currentUser={currentUser}
+                                allExperts={allExperts}
+                                onRefreshSlots={fetchExpertSlots}
+                                onRefreshEvaluations={fetchEvaluations}
+                                mode="form"
+                            />
+                        )}
+
+                        {activeMainTab === 'evaluation_summary' && (
+                            <ExpertEvaluationsTab
+                                applicantId={id}
+                                evaluations={evaluations}
+                                expertSlots={expertSlots}
+                                categories={criteria}
+                                currentUser={currentUser}
+                                allExperts={allExperts}
+                                onRefreshSlots={fetchExpertSlots}
+                                onRefreshEvaluations={fetchEvaluations}
+                                mode="summary"
+                                scoringScheme={scoringScheme}
+                                onChangeScheme={updateScoringScheme}
                             />
                         )}
                     </Paper>
@@ -457,6 +695,19 @@ export default function ApplicantDetails() {
                     <Button onClick={() => setUploadTypeDialogOpen(false)}>Отмена</Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={Boolean(notification)}
+                autoHideDuration={6000}
+                onClose={() => setNotification(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                {notification && (
+                    <Alert onClose={() => setNotification(null)} severity={notification.severity} sx={{ width: '100%' }}>
+                        {notification.message}
+                    </Alert>
+                )}
+            </Snackbar>
         </>
     );
 }

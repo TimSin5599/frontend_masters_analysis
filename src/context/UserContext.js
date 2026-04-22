@@ -5,9 +5,9 @@ import React from 'react';
 import { generatePasswordHash } from '../utils/hash';
 import { mockUser } from './mock';
 
-//config
 import config from '../../src/config';
 import { showSnackbar } from '../components/Snackbar';
+import { getToken, setToken, clearToken } from '../utils/tokenManager';
 
 let UserStateContext = React.createContext();
 let UserDispatchContext = React.createContext();
@@ -55,20 +55,18 @@ function userReducer(state, action) {
 function UserProvider({ children }) {
   let [state, dispatch] = React.useReducer(userReducer, {
     isAuthenticated: () => {
-      const token = localStorage.getItem('token');
-      if (config.isBackend && token) {
-        const date = new Date().getTime() / 1000;
-        const data = jwt.decode(token);
-        if (!data) return false;
-        return date < data.exp;
-      } else if (token) {
-        return true;
-      }
-      return false;
+      return localStorage.getItem('isLoggedIn') === 'true';
     },
     isFetching: false,
     errorMessage: '',
-    currentUser: null,
+    currentUser: (() => {
+      try {
+        const user = localStorage.getItem('user');
+        return user ? JSON.parse(user) : null;
+      } catch (e) {
+        return null;
+      }
+    })(),
     loadingInit: true,
   });
 
@@ -124,7 +122,7 @@ function loginUser(
       axios
         .post(`${config.baseURLApi}/v1/login`, { email: login, password })
         .then(async (res) => {
-          const token = res.data.token;
+          const token = res.data.access_token;
           setError(null);
           setIsLoading(false);
           const hash = await generatePasswordHash(password);
@@ -169,39 +167,29 @@ export function sendPasswordResetEmail(email) {
 }
 
 function signOut(dispatch, history) {
-  localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('user_id');
   localStorage.removeItem('cPwdH');
-  document.cookie = 'token=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  axios.defaults.headers.common['Authorization'] = '';
+  localStorage.setItem('isLoggedIn', 'false');
+  clearToken();
+  axios.post('/v1/logout').catch(() => {});
+  
   dispatch({ type: 'SIGN_OUT_SUCCESS' });
   history.push('/login');
 }
 
 export function receiveToken(token, dispatch) {
-  let user;
+  let user = { email: 'unknown' };
 
-  // We check if app runs with backend mode
-  if (config.isBackend) {
-    const decoded = jwt.decode(token);
-    if (decoded && decoded.user) {
-      user = decoded.user;
-    } else {
-      user = { email: 'unknown' };
-    }
-    delete user.id;
-  } else {
-    user = {
-      email: config.auth.email,
-    };
+  if (!config.isBackend) {
+    user = { email: config.auth.email };
   }
 
-  delete user.id;
-  localStorage.setItem('token', token);
+  setToken(token);
   localStorage.setItem('user', JSON.stringify(user));
   localStorage.setItem('theme', 'default');
-  axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+  localStorage.setItem('isLoggedIn', 'true');
+  
   dispatch({ type: 'LOGIN_SUCCESS' });
 }
 
@@ -235,22 +223,20 @@ export function doInit() {
       });
     } else {
       try {
-        let token = localStorage.getItem('token');
-        if (token) {
-          currentUser = await findMe();
-        }
+        const res = await axios.post(`${config.baseURLApi}/v1/refresh`);
+        setToken(res.data.access_token);
+        
+        currentUser = await findMe();
+        
         if (currentUser && currentUser.id) {
           sessionStorage.setItem('user_id', currentUser.id);
         }
         dispatch({
           type: 'LOGIN_SUCCESS',
-          payload: {
-            currentUser,
-          },
+          payload: { currentUser },
         });
       } catch (error) {
-        console.log(error);
-
+        console.log("No refresh token or session expired");
         dispatch({
           type: 'AUTH_INIT_ERROR',
           payload: error,

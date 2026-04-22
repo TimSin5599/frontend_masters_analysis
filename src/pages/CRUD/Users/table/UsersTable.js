@@ -13,14 +13,11 @@ import { DataGrid } from '@mui/x-data-grid';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
 import { Button } from 'components/Wrappers/Wrappers';
 
 import Widget from 'components/Widget';
 import Dialog from '../../../../components/Dialog';
 import Actions from '../../../../components/Table/Actions';
-import ExpertSlotsManager from '../../../../pages/user/ExpertSlotsManager';
 
 const useStyles = makeStyles({
   container: {
@@ -44,8 +41,6 @@ const UsersTable = () => {
   const classes = useStyles();
   // eslint-disable-next-line no-unused-vars
   const [width, setWidth] = React.useState(window.innerWidth);
-  const [activeTab, setActiveTab] = React.useState(0);
-
   const [loading, setLoading] = React.useState(false);
   const [sortModel, setSortModel] = React.useState([]);
   const [selectionModel, setSelectionModel] = React.useState([]);
@@ -185,75 +180,57 @@ const UsersTable = () => {
 
   return (
     <div>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={activeTab} 
-          onChange={(e, v) => setActiveTab(v)}
-          indicatorColor="primary"
-          textColor="primary"
-        >
-          <Tab label="Список пользователей" />
-          <Tab label="Управление экспертами" />
-        </Tabs>
-      </Box>
+      <Widget
+        title='Пользователи'
+        disableWidgetMenu
+        actions={
+          <Link to='/app/user/new' style={{ textDecoration: 'none' }}>
+            <Button variant='contained' color="primary">Добавить пользователя</Button>
+          </Link>
+        }
+      >
 
-      {activeTab === 0 ? (
-        <Widget
-          title='Пользователи'
-          disableWidgetMenu
-          actions={
-            <Link to='/app/user/new' style={{ textDecoration: 'none' }}>
-              <Button variant='contained' color="primary">Добавить пользователя</Button>
-            </Link>
-          }
+        <div
+          style={{
+            minHeight: 500,
+            width: '100%',
+            paddingTop: 20,
+            paddingBottom: 20,
+          }}
         >
-
-          <div
-            style={{
-              minHeight: 500,
-              width: '100%',
-              paddingTop: 20,
-              paddingBottom: 20,
+          <DataGrid
+            rows={loading ? [] : rows}
+            columns={columns}
+            sortingMode='server'
+            sortModel={sortModel}
+            onSortModelChange={handleSortModelChange}
+            rowsPerPageOptions={[5, 10, 20, 50, 100]}
+            pageSize={5}
+            pagination
+            {...rowsState}
+            paginationMode='server'
+            components={{ NoRowsOverlay, LoadingOverlay: LinearProgress }}
+            onPageChange={(page) => {
+              setRowsState((prev) => ({ ...prev, page }));
             }}
-          >
-            <DataGrid
-              rows={loading ? [] : rows}
-              columns={columns}
-              sortingMode='server'
-              sortModel={sortModel}
-              onSortModelChange={handleSortModelChange}
-              rowsPerPageOptions={[5, 10, 20, 50, 100]}
-              pageSize={5}
-              pagination
-              {...rowsState}
-              paginationMode='server'
-              components={{ NoRowsOverlay, LoadingOverlay: LinearProgress }}
-              onPageChange={(page) => {
-                setRowsState((prev) => ({ ...prev, page }));
-              }}
-              onPageSizeChange={(pageSize) => {
-                setRowsState((prev) => ({ ...prev, pageSize }));
-              }}
-              onSelectionModelChange={(newSelectionModel) => {
-                setSelectionModel(newSelectionModel);
-              }}
-              selectionModel={selectionModel}
-              checkboxSelection
-              disableSelectionOnClick
-              disableColumnMenu
-              loading={loading}
-              onRowClick={(e) => {
-                history.push(`/app/users/${e.id}/edit`);
-              }}
-              autoHeight
-            />
-          </div>
-        </Widget>
-      ) : (
-        <Widget title="Управление экспертами" disableWidgetMenu>
-          <ExpertSlotsManager />
-        </Widget>
-      )}
+            onPageSizeChange={(pageSize) => {
+              setRowsState((prev) => ({ ...prev, pageSize }));
+            }}
+            onSelectionModelChange={(newSelectionModel) => {
+              setSelectionModel(newSelectionModel);
+            }}
+            selectionModel={selectionModel}
+            checkboxSelection
+            disableSelectionOnClick
+            disableColumnMenu
+            loading={loading}
+            onRowClick={(e) => {
+              history.push(`/app/users/${e.id}/edit`);
+            }}
+            autoHeight
+          />
+        </div>
+      </Widget>
 
       <Dialog
         open={modalOpen || false}

@@ -1,18 +1,49 @@
 import React from 'react';
 import { Box, Button, Grid, IconButton, TextField, Typography } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/Delete';
+import DoneIcon from '@mui/icons-material/Done';
 
 const LanguageSection = ({
     data,
     setData,
     isEditing,
     setActiveDocumentId,
-    handleDeleteDocument
+    handleDeleteDocument,
+    handleSave,
+    currentUser,
+    applicantStatus
 }) => {
-    if (!data) return null;
+    if (data === null || data === undefined) return null;
+
+    const isAI = data.source === 'model';
+    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
 
     return (
-        <Box mt={4}>
+        <Box mt={4} sx={{ 
+            backgroundColor: isAI ? '#fff9c4' : 'transparent', 
+            p: isAI ? 2 : 0, 
+            borderRadius: 2,
+            border: isAI ? '1px solid #ffe082' : 'none',
+            transition: 'all 0.3s ease'
+        }}>
+            {isAI && (
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="subtitle2" color="warning.dark" sx={{ fontWeight: 'bold' }}>
+                        ✨ Данные сертификата извлечены ИИ. Пожалуйста, проверьте и подтвердите.
+                    </Typography>
+                    {canConfirm && (
+                        <Button 
+                            variant="contained" 
+                            color="success" 
+                            size="small" 
+                            startIcon={<DoneIcon />}
+                            onClick={handleSave}
+                        >
+                            Подтвердить
+                        </Button>
+                    )}
+                </Box>
+            )}
             <Box display="flex" justifyContent="flex-end" mb={1}>
                 {data.document_id && (
                     <>

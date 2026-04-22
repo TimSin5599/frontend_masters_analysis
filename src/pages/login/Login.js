@@ -66,8 +66,8 @@ function Login(props) {
   let [error, setError] = useState(null);
   let [activeTabId, setActiveTabId] = useState(+tab ?? 0);
   let [nameValue, setNameValue] = useState('');
-  let [loginValue, setLoginValue] = useState('admin@flatlogic.com');
-  let [passwordValue, setPasswordValue] = useState('password');
+  let [loginValue, setLoginValue] = useState('');
+  let [passwordValue, setPasswordValue] = useState('');
   let [forgotEmail, setForgotEmail] = useState('');
   let [isForgot, setIsForgot] = useState(false);
 
@@ -169,7 +169,7 @@ function Login(props) {
               {activeTabId === 0 && (
                 <React.Fragment>
                   <div className={classes.topSection}>
-                    {config.isBackend ? (
+                    {/* {config.isBackend ? (
                       <Widget
                         disableWidgetMenu
                         inheritHeight
@@ -186,7 +186,7 @@ function Login(props) {
                           to login!
                         </Typography>
                       </Widget>
-                    ) : null}
+                    ) : null} */}
                     <div className={classes.greetingWrapper}>
                       <Typography variant='h1' className={classes.greeting}>
                         {getGreeting()}!

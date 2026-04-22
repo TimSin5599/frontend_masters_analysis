@@ -1,6 +1,4 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
-import axios from 'axios';
 import { createStore, applyMiddleware, compose } from 'redux';
 import ReduxThunk from 'redux-thunk';
 import { Provider } from 'react-redux';
@@ -18,7 +16,7 @@ import {
   ThemeStateContext,
 } from './context/ThemeContext';
 import CssBaseline from '@mui/material/CssBaseline';
-import config from '../src/config';
+import setupAxiosInterceptors from './utils/axiosInterceptor';
 
 import { createHashHistory, createMemoryHistory } from 'history';
 
@@ -33,17 +31,12 @@ export function getHistory() {
   return history;
 }
 
-axios.defaults.baseURL = config.baseURLApi;
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-const token = localStorage.getItem('token');
-if (token) {
-  axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
-}
-
 export const store = createStore(
   createRootReducer(history),
   compose(applyMiddleware(routerMiddleware(history), ReduxThunk)),
 );
+
+setupAxiosInterceptors(store);
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 

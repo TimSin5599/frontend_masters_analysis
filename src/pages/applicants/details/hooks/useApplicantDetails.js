@@ -1,23 +1,47 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { getToken } from "../../../../utils/tokenManager";
 import config from '../../../../config';
 import { formatDateForStorage } from '../../../../utils/dateUtils';
+import { useUserState } from '../../../../context/UserContext';
 
-export const useApplicantDetails = (id, activeCategory) => {
+export const useApplicantDetails = (id, activeCategory, programId) => {
+    const { currentUser } = useUserState();
     const [applicantName, setApplicantName] = useState(`Абитуриент #${id}`);
     const [activeDocumentId, setActiveDocumentId] = useState(null);
     const [processingState, setProcessingState] = useState({});
     const [evaluations, setEvaluations] = useState([]);
     const [expertSlots, setExpertSlots] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const [allExperts, setAllExperts] = useState([]);
     const [documents, setDocuments] = useState([]);
     const [data, setData] = useState(null);
+    const [criteria, setCriteria] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [activeSubTab, setActiveSubTab] = useState(0);
     const [personalDataDocType, setPersonalDataDocType] = useState("passport");
     const [uploadTypeDialogOpen, setUploadTypeDialogOpen] = useState(false);
     const [pendingFile, setPendingFile] = useState(null);
+    const [applicantStatus, setApplicantStatus] = useState(null);
+    const [notification, setNotification] = useState(null); // { message, severity }
+    const [scoringScheme, setScoringSchemeState] = useState('default');
+
+    const fetchApplicantStatus = useCallback(() => {
+        axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=passport`)
+            .then(res => {
+                if (res.data && res.data.status) {
+                    setApplicantStatus(res.data.status);
+                } else {
+                    // fallback if not in passport
+                    axios.get(`${config.manageApi}/v1/applicants`)
+                        .then(allRes => {
+                            const app = (allRes.data || []).find(a => a.id === parseInt(id));
+                            if (app) setApplicantStatus(app.status);
+                        });
+                }
+            })
+            .catch(console.error);
+    }, [id]);
 
     const updateProcessingState = useCallback((category, status, progressVal) => {
         setProcessingState(prev => {
@@ -45,14 +69,15 @@ export const useApplicantDetails = (id, activeCategory) => {
         setIsEditing(false);
         setActiveSubTab(0);
         
-        if (activeCategory === "diploma") {
+        if (activeCategory === "diploma" || activeCategory === "transcript") {
             Promise.all([
                 axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=diploma`),
                 axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=transcript`)
             ]).then(([diplomaRes, transcriptRes]) => {
+                // Диплом разворачивается последним — его source имеет приоритет для isAI баннера
                 setData({
-                    ...(diplomaRes.data || {}),
-                    ...(transcriptRes.data || {})
+                    ...(transcriptRes.data || {}),
+                    ...(diplomaRes.data || {})
                 });
                 setLoading(false);
             }).catch(err => {
@@ -74,49 +99,104 @@ export const useApplicantDetails = (id, activeCategory) => {
                 .catch(err => {
                     console.error(err);
                     const multiRecordCategories = ['prof_development', 'second_diploma', 'certification', 'achievement', 'recommendation'];
-                    setData(multiRecordCategories.includes(activeCategory) ? [] : null);
+                    // Use empty object (not null) so form sections can render editable empty fields
+                    setData(multiRecordCategories.includes(activeCategory) ? [] : {});
                     setLoading(false);
                 });
         }
     }, [id, activeCategory]);
 
-    const fetchEvaluations = useCallback(() => {
-        axios.get(`${config.manageApi}/v1/applicants/${id}/evaluations`)
-            .then(res => setEvaluations(res.data))
+    const fetchCriteria = useCallback(() => {
+        axios.get(`${config.manageApi}/v1/applicants/${id}/criteria`)
+            .then(res => setCriteria(res.data))
+            .catch(err => {
+                console.error("Error fetching criteria:", err);
+                // Fallback if needed, but the backend should provide them
+            });
+    }, [id]);
+
+    const fetchEvaluations = useCallback((directData) => {
+        if (directData && Array.isArray(directData)) {
+            setEvaluations(directData);
+            return;
+        }
+        
+        if (!currentUser) return;
+
+        const userId = currentUser?.id || currentUser?._id || "";
+        const role = String(currentUser?.role || "").toLowerCase();
+        
+        axios.get(`${config.manageApi}/v1/applicants/${id}/evaluations?user_id=${userId}&user_role=${role}`)
+            .then(res => {
+                setEvaluations(res.data);
+            })
+            .catch(err => {
+                console.error("Error fetching evaluations:", err);
+            });
+    }, [id, currentUser]);
+
+    const fetchExpertSlots = useCallback(() => {
+        if (!programId) return;
+        axios.get(`${config.manageApi}/v1/experts/slots?program_id=${programId}`)
+            .then(res => setExpertSlots(res.data))
+            .catch(console.error);
+    }, [programId]);
+
+    const fetchAllExperts = useCallback(() => {
+        axios.get(`${config.manageApi}/v1/experts`)
+            .then(res => setAllExperts(res.data))
+            .catch(console.error);
+    }, []);
+
+    const fetchScoringScheme = useCallback(() => {
+        axios.get(`${config.manageApi}/v1/applicants/${id}/scoring-scheme`)
+            .then(res => setScoringSchemeState(res.data.scheme || 'default'))
             .catch(console.error);
     }, [id]);
+
+    const updateScoringScheme = useCallback((newScheme) => {
+        const role = String(currentUser?.role || "").toLowerCase();
+        return axios.patch(`${config.manageApi}/v1/applicants/${id}/scoring-scheme`, {
+            scheme: newScheme,
+            user_role: role,
+        }).then(() => {
+            setScoringSchemeState(newScheme === 'auto' ? 'default' : newScheme);
+            fetchScoringScheme();
+            fetchCriteria();
+        });
+    }, [id, currentUser, fetchScoringScheme, fetchCriteria]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
     useEffect(() => {
-        // Fetch initial name
+        if (!id) return;
+        
+        // 1. Fetch non-user-dependent data
+        fetchCriteria();
+        fetchScoringScheme();
+        fetchExpertSlots();
+        fetchAllExperts();
+        fetchDocuments();
+        fetchApplicantStatus();
+
+        // 2. Fetch applicant name
         axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=passport`)
             .then(res => {
                 if (res.data && res.data.name && res.data.surname) {
                     setApplicantName(`${res.data.name} ${res.data.surname}`);
                 }
             })
-            .catch(console.error);
-        
-        fetchEvaluations();
-        
-        axios.get(`${config.manageApi}/v1/experts/slots`)
-            .then(res => setExpertSlots(res.data))
-            .catch(console.error);
+            .catch(err => console.error("Error fetching applicant name:", err));
+    }, [id, fetchCriteria, fetchScoringScheme, fetchExpertSlots, fetchAllExperts, fetchDocuments, fetchApplicantStatus]);
 
-        try {
-            const userStr = localStorage.getItem("user");
-            if (userStr) {
-                setCurrentUser(JSON.parse(userStr));
-            }
-        } catch (e) {
-            console.error(e);
+    // 3. Separate effect for evaluations to ensure they refresh when currentUser loads
+    useEffect(() => {
+        if (id && currentUser) {
+            fetchEvaluations();
         }
-
-        fetchDocuments();
-    }, [id, fetchEvaluations, fetchDocuments]);
+    }, [id, currentUser, fetchEvaluations]);
 
     // Auto-select document when category or documents change
     useEffect(() => {
@@ -152,21 +232,48 @@ export const useApplicantDetails = (id, activeCategory) => {
         let reconnectTimeout;
 
         const connectWebSocket = () => {
-            const wsUrl = config.manageApi.replace('http', 'ws') + `/v1/applicants/${id}/ws`;
+            const token = getToken();
+            if (!token || token === "null" || token === "undefined") {
+                reconnectTimeout = setTimeout(connectWebSocket, 1000);
+                return;
+            }
+            const wsUrl = config.manageApi.replace('http', 'ws') + `/v1/applicants/${id}/ws?token=${token}`;
             socket = new WebSocket(wsUrl);
 
             socket.onmessage = (event) => {
                 const msgData = JSON.parse(event.data);
+
+                // Авто-переход: все документы обработаны, статус изменился
+                if (msgData.event === 'status_changed' && msgData.status === 'verifying') {
+                    setApplicantStatus('verifying');
+                    setNotification({ message: 'Все документы проанализированы. Абитуриент передан на проверку.', severity: 'success' });
+                    return;
+                }
+
+                // Авто-переход: все документы обработаны, но не хватает обязательных
+                if (msgData.event === 'analysis_done') {
+                    setNotification({ message: `Анализ завершён. Не хватает документов: ${msgData.missing}`, severity: 'warning' });
+                    return;
+                }
+
                 if (msgData.category) {
+                    const baseCategory = msgData.category.split(':')[0]; // strip docType suffix
                     if (msgData.status === 'completed') {
-                        updateProcessingState(msgData.category, 'completed', 100);
+                        updateProcessingState(baseCategory, 'completed', 100);
                         fetchDocuments();
-                        if (msgData.category === activeCategory) fetchData();
+                        if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
+                    } else if (msgData.status === 'classification_failed' || msgData.status === 'extraction_failed') {
+                        // Terminal error — refresh docs so the UI shows the persisted error status
+                        updateProcessingState(baseCategory, msgData.status, 0);
+                        fetchDocuments();
+                        if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
                     } else if (msgData.status === 'failed') {
-                        updateProcessingState(msgData.category, 'failed');
-                        setTimeout(() => updateProcessingState(msgData.category, null), 3000);
+                        // Legacy fallback
+                        updateProcessingState(baseCategory, 'extraction_failed', 0);
+                        fetchDocuments();
                     } else {
-                        updateProcessingState(msgData.category, 'processing', msgData.progress || 0);
+                        // In-flight statuses: classifying, classified, extracting, processing, saving
+                        updateProcessingState(baseCategory, 'processing', msgData.progress || 0);
                     }
                 }
             };
@@ -208,18 +315,18 @@ export const useApplicantDetails = (id, activeCategory) => {
 
     const handleSave = () => {
         let userMeta = {};
-        try {
-            const userStr = localStorage.getItem("user");
-            if (userStr) {
-                const userObj = JSON.parse(userStr);
-                userMeta = {
-                    role: userObj.role === 'admin' ? 'админ' : 'оператор',
-                    first_name: userObj.firstName || "",
-                    last_name: userObj.lastName || "",
-                    patronymic: userObj.patronymic || ""
-                };
-            }
-        } catch (e) { console.error(e); }
+        if (currentUser) {
+            let roleLabel = 'оператор';
+            if (currentUser.role === 'admin')   roleLabel = 'админ';
+            if (currentUser.role === 'manager') roleLabel = 'менеджер';
+            if (currentUser.role === 'expert')  roleLabel = 'эксперт';
+            userMeta = {
+                role:       roleLabel,
+                first_name: currentUser.firstName  || "",
+                last_name:  currentUser.lastName   || "",
+                patronymic: currentUser.patronymic || "",
+            };
+        }
 
         // Pre-process date fields to ensure they are in YYYY-MM-DD format for storage
         const processDateFields = (obj) => {
@@ -243,11 +350,20 @@ export const useApplicantDetails = (id, activeCategory) => {
 
         const payload = Array.isArray(processedData) ? { records: processedData, ...userMeta } : { ...processedData, ...userMeta };
         const apiCategory = activeCategory === 'personal_data' ? personalDataDocType : activeCategory;
-        axios.patch(`${config.manageApi}/v1/applicants/${id}/data?category=${apiCategory}`, payload)
+
+        // Для диплома патчим и диплом, и транскрипт одним вызовом — оба хранятся совместно
+        const requests = (activeCategory === 'diploma' || activeCategory === 'transcript')
+            ? [
+                axios.patch(`${config.manageApi}/v1/applicants/${id}/data?category=diploma`, payload),
+                axios.patch(`${config.manageApi}/v1/applicants/${id}/data?category=transcript`, payload),
+              ]
+            : [axios.patch(`${config.manageApi}/v1/applicants/${id}/data?category=${apiCategory}`, payload)];
+
+        Promise.all(requests)
             .then(() => {
                 alert("Данные успешно сохранены");
                 setIsEditing(false);
-                fetchData(); // Refresh to get standardized format from backend if needed
+                fetchData();
             })
             .catch(err => {
                 console.error(err);
@@ -320,8 +436,38 @@ export const useApplicantDetails = (id, activeCategory) => {
         }
     };
 
+    const transferToExperts = () => {
+        setLoading(true);
+        const userName = [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(' ') || currentUser?.email || '';
+        const userRole = currentUser?.role || '';
+        axios.post(`${config.manageApi}/v1/applicants/${id}/transfer-to-experts`, { user_name: userName, user_role: userRole })
+            .then(() => {
+                alert("Абитуриент успешно передан экспертам");
+                fetchApplicantStatus();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Ошибка при передаче экспертам");
+            })
+            .finally(() => setLoading(false));
+    };
+
+    const handleSaveCategory = (docId, newCategory) => {
+        axios.patch(`${config.manageApi}/v1/documents/${docId}/category`, { category: newCategory })
+            .then(() => {
+                alert("Категория документа изменена, начата обработка.");
+                fetchDocuments();
+                fetchData();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Ошибка при изменении категории");
+            });
+    };
+
     return {
         applicantName,
+        applicantStatus,
         data, setData,
         loading,
         isEditing, setIsEditing,
@@ -341,6 +487,15 @@ export const useApplicantDetails = (id, activeCategory) => {
         uploadDocumentWithData,
         confirmRescan,
         fetchData,
-        fetchDocuments
+        fetchDocuments,
+        criteria,
+        fetchCriteria,
+        allExperts,
+        fetchExpertSlots,
+        transferToExperts,
+        handleSaveCategory,
+        notification, setNotification,
+        scoringScheme,
+        updateScoringScheme,
     };
 };

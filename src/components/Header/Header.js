@@ -173,7 +173,7 @@ export default function Header(props) {
           >
             <AccountIcon className={classes.profileMenuIcon} />
             <Link to='/app/profile' style={{ textDecoration: 'none' }}>
-              Profile
+              Профиль
             </Link>
           </MenuItem>
           <MenuItem
@@ -188,7 +188,7 @@ export default function Header(props) {
               className={classes.profileMenuLink}
               color='primary'
             >
-              Sign Out
+              Выйти
             </Typography>
           </MenuItem>
         </Menu>

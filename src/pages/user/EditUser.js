@@ -170,12 +170,12 @@ const EditUser = () => {
               aria-label='full width tabs example'
             >
               <Tab
-                label='PROFILE'
+                label='ПРОФИЛЬ'
                 icon={<PersonOutlineIcon />}
                 classes={{ wrapper: classes.icon }}
               />
               <Tab
-                label='CHANGE PASSWORD'
+                label='ИЗМЕНИТЬ ПАРОЛЬ'
                 icon={<LockIcon />}
                 classes={{ wrapper: classes.icon }}
               />
@@ -194,28 +194,28 @@ const EditUser = () => {
                     weight={'medium'}
                     style={{ marginBottom: 35, marginTop: 15 }}
                   >
-                    Personal Information
+                    Личная информация
                   </Typography>
                   <TextField
-                    label='Name'
+                    label='Имя'
                     variant='outlined'
-                    defaultValue='Name'
+                    defaultValue='Имя'
                     value={data && data.firstName}
                     name='firstName'
                     onChange={handleChange}
                     style={{ marginBottom: 35 }}
                   />
                   <TextField
-                    label='Last Name'
+                    label='Фамилия'
                     variant='outlined'
-                    defaultValue={'Last Name'}
+                    defaultValue={'Фамилия'}
                     value={data && data.lastName}
                     name='lastName'
                     onChange={handleChange}
                     style={{ marginBottom: 35 }}
                   />
                   <TextField
-                    label='Phone'
+                    label='Телефон'
                     variant='outlined'
                     style={{ marginBottom: 35 }}
                     defaultValue={'1-555-666-7070'}
@@ -242,14 +242,14 @@ const EditUser = () => {
                     weight={'medium'}
                     style={{ marginBottom: 35, marginTop: 15 }}
                   >
-                    Password
+                    Пароль
                   </Typography>
                   <TextField
-                    label='Current Password'
+                    label='Текущий пароль'
                     type={showCurrentPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
-                    defaultValue={'Current Password'}
+                    defaultValue={'Текущий пароль'}
                     value={password.currentPassword || ''}
                     name='currentPassword'
                     onChange={handleChangePassword}
@@ -271,11 +271,11 @@ const EditUser = () => {
                     }}
                   />
                   <TextField
-                    label='New Password'
+                    label='Новый пароль'
                     type={showNewPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
-                    defaultValue={'New Password'}
+                    defaultValue={'Новый пароль'}
                     value={password.newPassword || ''}
                     name='newPassword'
                     onChange={handleChangePassword}
@@ -295,11 +295,11 @@ const EditUser = () => {
                     }}
                   />
                   <TextField
-                    label='Confirm Password'
+                    label='Подтвердите пароль'
                     type={showConfirmPassword ? 'text' : 'password'}
                     variant='outlined'
                     style={{ marginBottom: 35 }}
-                    defaultValue={'Verify Password'}
+                    defaultValue={'Подтвердите пароль'}
                     value={password.confirmPassword || ''}
                     name='confirmPassword'
                     onChange={handleChangePassword}
@@ -377,7 +377,7 @@ const EditUser = () => {
                   {tab !== 1 ? (
                     <>
                       <Button variant={'outlined'} onClick={handleSubmit}>
-                        Save
+                        Сохранить
                       </Button>
                     </>
                   ) : (
@@ -386,7 +386,7 @@ const EditUser = () => {
                         variant={'outlined'}
                         onClick={handleUpdatePassword}
                       >
-                        Save Password
+                        Сохранить пароль
                       </Button>
                     </>
                   )}

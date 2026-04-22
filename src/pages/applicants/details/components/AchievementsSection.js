@@ -1,5 +1,6 @@
 import { Box, Button, Grid, IconButton, Paper, TextField, Typography } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/Delete';
+import DoneIcon from '@mui/icons-material/Done';
 import { formatDateForDisplay } from '../../../../utils/dateUtils';
 
 const AchievementsSection = ({
@@ -8,12 +9,42 @@ const AchievementsSection = ({
     isEditing,
     activeSubTab,
     setActiveDocumentId,
-    handleDeleteDocument
+    handleDeleteDocument,
+    handleSave,
+    currentUser,
+    applicantStatus
 }) => {
     if (!Array.isArray(data)) return null;
 
+    const currentEntry = (data.length > 0 && activeSubTab !== 'add') ? data[activeSubTab] : null;
+    const isAI = currentEntry?.source === 'model';
+    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+
     return (
         <Box mt={1}>
+            {isAI && (
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{ 
+                    backgroundColor: '#fff9c4', 
+                    p: 2, 
+                    borderRadius: 2,
+                    border: '1px solid #ffe082',
+                }}>
+                    <Typography variant="subtitle2" color="warning.dark" sx={{ fontWeight: 'bold' }}>
+                        ✨ Данные извлечены ИИ. Пожалуйста, проверьте и подтвердите.
+                    </Typography>
+                    {canConfirm && (
+                        <Button 
+                            variant="contained" 
+                            color="success" 
+                            size="small" 
+                            startIcon={<DoneIcon />}
+                            onClick={handleSave}
+                        >
+                            Подтвердить
+                        </Button>
+                    )}
+                </Box>
+            )}
             {data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
                 <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
                     <Box display="flex" justifyContent="space-between" mb={1}>
@@ -52,16 +83,7 @@ const AchievementsSection = ({
                                     setData(newData);
                                 }} />
                         </Grid>
-                        <Grid item xs={6}>
-                            <TextField disabled={!isEditing} label="Организация" fullWidth variant="outlined" size="small"
-                                value={data[activeSubTab].company || ""}
-                                onChange={e => {
-                                    const newData = [...data];
-                                    newData[activeSubTab].company = e.target.value;
-                                    setData(newData);
-                                }} />
-                        </Grid>
-                        <Grid item xs={6}>
+                        <Grid item xs={12}>
                             <TextField disabled={!isEditing} label="Дата вручения" fullWidth variant="outlined" size="small"
                                 value={formatDateForDisplay(data[activeSubTab].date_received)}
                                 onChange={e => {

@@ -1,9 +1,9 @@
 import axios from 'axios';
 import Errors from 'components/FormItems/error/errors';
 import { push } from 'connected-react-router';
-import jwt from 'jsonwebtoken';
 import { showSnackbar } from '../components/Snackbar';
 import config from '../config';
+import { clearToken, setToken } from '../utils/tokenManager';
 
 export const AUTH_FAILURE = 'AUTH_FAILURE';
 export const LOGIN_REQUEST = 'LOGIN_REQUEST';
@@ -35,10 +35,15 @@ export function doInit() {
   return async (dispatch) => {
     try {
       let currentUser = null;
-      let token = localStorage.getItem('token');
-      if (token) {
+      try {
+        const res = await axios.post('/v1/refresh');
+        setToken(res.data.access_token);
         currentUser = await findMe();
+      } catch (err) {
+        // Если cookie нет или она истекла — ничего страшного, пользователь просто не залогинен
+        console.log('No refresh token found or expired');
       }
+
       dispatch({
         type: AUTH_INIT_SUCCESS,
         payload: {
@@ -57,31 +62,27 @@ export function doInit() {
 }
 
 export function logoutUser() {
-  return (dispatch) => {
-    dispatch({
-      type: LOGOUT_REQUEST,
-    });
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    axios.defaults.headers.common['Authorization'] = '';
-    dispatch({
-      type: LOGOUT_SUCCESS,
-    });
+  return async (dispatch) => {
+    dispatch({ type: LOGOUT_REQUEST });
+
+    try {
+      await axios.post('/v1/logout');
+    } catch (err) {
+      console.log('Logout API error:', err);
+    }
+
+    clearToken();
+    localStorage.setItem('isLoggedIn', 'false');
+    dispatch({ type: LOGOUT_SUCCESS });
     dispatch(push('/login'));
   };
 }
 
 export function receiveToken(token) {
   return (dispatch) => {
-    let user = jwt.decode(token);
-
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
-    dispatch({
-      type: LOGIN_SUCCESS,
-    });
-    dispatch(push('/app'));
+    setToken(token);
+    localStorage.setItem('isLoggedIn', 'true');
+    dispatch({ type: LOGIN_SUCCESS });
   };
 }
 
@@ -96,7 +97,7 @@ export function loginUser(creds) {
       axios
         .post(`${config.baseURLApi}/v1/login`, creds)
         .then((res) => {
-          const token = res.data.token; // res.data is {token: ...}
+          const token = res.data.access_token;
           dispatch(receiveToken(token));
           dispatch(doInit());
           dispatch(push('/app'));

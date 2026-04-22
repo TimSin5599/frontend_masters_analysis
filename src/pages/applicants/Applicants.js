@@ -1,18 +1,20 @@
-import { Grid } from "@mui/material";
+import { Grid, createTheme, ThemeProvider } from "@mui/material";
 import axios from "axios";
 import MUIDataTable from "mui-datatables";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import config from "../../config";
 
 // components
 import PageTitle from "../../components/PageTitle/PageTitle";
+import { StatusChip, CustomFilterList, StatusLegend, statusMap } from "./components/StatusComponents";
+import ApplicantTableFilter from "./components/ApplicantTableFilter";
 
 export default function ApplicantsPage() {
     const [applicants, setApplicants] = useState([]);
     const { programId } = useParams();
 
-    const fetchApplicants = () => {
+    const fetchApplicants = useCallback(() => {
         const url = programId
             ? `${config.manageApi}/v1/applicants?program_id=${programId}`
             : `${config.manageApi}/v1/applicants`;
@@ -22,19 +24,11 @@ export default function ApplicantsPage() {
                 setApplicants(res.data || []);
             })
             .catch(err => console.error(err));
-    };
+    }, [programId]);
 
     useEffect(() => {
         fetchApplicants();
-    }, [programId]);
-
-    const statusMap = {
-        "uploaded": "Создан",
-        "processing": "Загрузка",
-        "verifying": "Проверка",
-        "assessed": "Оценивание",
-        "completed": "Завершен"
-    };
+    }, [fetchApplicants]);
 
     const columns = [
         {
@@ -57,9 +51,18 @@ export default function ApplicantsPage() {
         {
             name: "last_name",
             label: "Фамилия",
+            options: { filter: false }
         },
-        { name: "first_name", label: "Имя" },
-        { name: "patronymic", label: "Отчество" },
+        { 
+            name: "first_name", 
+            label: "Имя",
+            options: { filter: false }
+        },
+        { 
+            name: "patronymic", 
+            label: "Отчество",
+            options: { filter: false }
+        },
         {
             name: "score",
             label: "Оценка",
@@ -71,13 +74,17 @@ export default function ApplicantsPage() {
             name: "status",
             label: "Статус",
             options: {
-                customBodyRender: (value) => statusMap[value] || value
+                filterOptions: {
+                    renderValue: (v) => statusMap[v]?.label || v
+                },
+                customBodyRender: (value) => <StatusChip status={value} />
             }
         },
         {
             name: "created_at",
             label: "Дата создания",
             options: {
+                filter: false,
                 customBodyRender: (value) => {
                     const date = new Date(value);
                     const day = String(date.getDate()).padStart(2, '0');
@@ -90,6 +97,36 @@ export default function ApplicantsPage() {
             }
         }
     ];
+
+
+    const getMuiTheme = () => createTheme({
+        components: {
+            MUIDataTableFilter: {
+                styleOverrides: {
+                    root: {
+                        padding: '16px',
+                        width: '350px',
+                    },
+                    title: {
+                        fontWeight: 700,
+                        fontSize: '1.1rem',
+                        marginBottom: '16px',
+                        color: '#333'
+                    },
+                    reset: {
+                        display: 'none' // We use our own footer
+                    }
+                }
+            },
+            MUIDataTableFilterList: {
+                styleOverrides: {
+                    root: {
+                        marginBottom: '16px'
+                    }
+                }
+            }
+        }
+    });
 
     return (
         <>
@@ -105,11 +142,19 @@ export default function ApplicantsPage() {
             />
             <Grid container spacing={4}>
                 <Grid item xs={12}>
+                    <StatusLegend />
+                <ThemeProvider theme={getMuiTheme()}>
                     <MUIDataTable
-                        title="Applicant List"
+                        title="Список абитуриентов"
                         data={applicants}
                         columns={columns}
+                        components={{
+                            TableFilterList: CustomFilterList,
+                        }}
                         options={{
+                            filter: true,
+                            confirmFilters: true,
+                            customFilterDialogFooter: ApplicantTableFilter,
                             filterType: "checkbox",
                             onRowClick: (rowData) => {
                                 const url = programId
@@ -136,6 +181,7 @@ export default function ApplicantsPage() {
                             }
                         }}
                     />
+                </ThemeProvider>
                 </Grid>
             </Grid>
         </>

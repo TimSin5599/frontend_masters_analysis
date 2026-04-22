@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Button, Grid, IconButton, Paper, TextField, Typography } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/Delete';
+import DoneIcon from '@mui/icons-material/Done';
 
 const RecommendationSection = ({
     data,
@@ -8,12 +9,42 @@ const RecommendationSection = ({
     isEditing,
     activeSubTab,
     setActiveDocumentId,
-    handleDeleteDocument
+    handleDeleteDocument,
+    handleSave,
+    currentUser,
+    applicantStatus
 }) => {
     if (!Array.isArray(data)) return null;
 
+    const currentEntry = (data.length > 0 && activeSubTab !== 'add') ? data[activeSubTab] : null;
+    const isAI = currentEntry?.source === 'model';
+    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+
     return (
         <Box mt={1}>
+            {isAI && (
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{ 
+                    backgroundColor: '#fff9c4', 
+                    p: 2, 
+                    borderRadius: 2,
+                    border: '1px solid #ffe082',
+                }}>
+                    <Typography variant="subtitle2" color="warning.dark" sx={{ fontWeight: 'bold' }}>
+                        ✨ Данные рекомендации извлечены ИИ. Пожалуйста, проверьте и подтвердите.
+                    </Typography>
+                    {canConfirm && (
+                        <Button 
+                            variant="contained" 
+                            color="success" 
+                            size="small" 
+                            startIcon={<DoneIcon />}
+                            onClick={handleSave}
+                        >
+                            Подтвердить
+                        </Button>
+                    )}
+                </Box>
+            )}
             {data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
                 <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
                     <Box display="flex" justifyContent="space-between" mb={1}>

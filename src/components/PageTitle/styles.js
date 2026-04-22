@@ -11,7 +11,6 @@ export default makeStyles((theme) => ({
     display: 'flex',
     justifyContent: 'space-between',
     marginBottom: theme.spacing(1),
-    marginTop: theme.spacing(2),
   },
   typo: {
     color: theme.palette.text.hint,

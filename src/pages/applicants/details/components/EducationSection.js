@@ -1,5 +1,6 @@
-import { Box, Divider, Grid, TextField, Typography } from "@mui/material";
+import { Box, Divider, Grid, TextField, Typography, Button } from "@mui/material";
 import { formatDateForDisplay } from '../../../../utils/dateUtils';
+import DoneIcon from '@mui/icons-material/Done';
 
 const EducationSection = ({
     data,
@@ -8,16 +9,46 @@ const EducationSection = ({
     documents,
     activeDocumentId,
     setActiveDocumentId,
-    handleDeleteDocument
+    handleDeleteDocument,
+    handleSave,
+    currentUser,
+    applicantStatus
 }) => {
-    if (!data) return null;
+    if (data === null || data === undefined) return null;
     const safeDocs = documents || [];
 
     const diplomaDoc = safeDocs.find(d => d.file_type === 'diploma');
     const transcriptDoc = safeDocs.find(d => d.file_type === 'transcript');
 
+    const isAI = data.source === 'model';
+    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+
     return (
-        <Box mt={1}>
+        <Box mt={1} sx={{
+            backgroundColor: isAI ? '#fff9c4' : 'transparent',
+            p: isAI ? 2 : 0,
+            borderRadius: 2,
+            border: isAI ? '1px solid #ffe082' : 'none',
+            transition: 'all 0.3s ease'
+        }}>
+            {isAI && (
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="subtitle2" color="warning.dark" sx={{ fontWeight: 'bold' }}>
+                        ✨ Данные извлечены ИИ. Пожалуйста, проверьте и подтвердите.
+                    </Typography>
+                    {canConfirm && (
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<DoneIcon />}
+                            onClick={handleSave}
+                        >
+                            Подтвердить всё
+                        </Button>
+                    )}
+                </Box>
+            )}
             <Grid container spacing={2}>
                 <Grid item xs={12}>
                     <TextField disabled={!isEditing} label="Учебное заведение" fullWidth variant="outlined" size="small"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Router, Route, Switch, Redirect } from 'react-router-dom';
 import { ConnectedRouter } from 'connected-react-router';
+import { Box, CircularProgress } from '@mui/material';
 import { SnackbarProvider } from './Snackbar';
 
 // components
@@ -14,13 +15,30 @@ import Verify from '../pages/verify';
 import Reset from '../pages/reset';
 
 // context
-import { useUserState } from '../context/UserContext';
+import { useUserState, useUserDispatch, doInit } from '../context/UserContext';
 import { getHistory } from '../index';
 
 export default function App() {
   // global
   let { isAuthenticated } = useUserState();
+  const dispatch = useUserDispatch();
   const isAuth = isAuthenticated();
+  const [isInitializing, setIsInitializing] = React.useState(isAuth);
+
+  React.useEffect(() => {
+    if (isAuth) {
+      doInit()(dispatch).finally(() => setIsInitializing(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (isInitializing) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <>
