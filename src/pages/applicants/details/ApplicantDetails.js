@@ -416,19 +416,6 @@ export default function ApplicantDetails() {
                                         </Box>
                                     )}
 
-                                    {processingStatus && (
-                                        <Box mt={2} mb={4} p={2} component={Paper} variant="outlined" style={{ backgroundColor: '#fafafa' }}>
-                                            <Box display="flex" justifyContent="space-between" mb={1}>
-                                                {["Загрузка", "Подготовка", "ИИ анализ (1-2 мин)", "Завершение"].map((label, idx) => (
-                                                    <Typography key={idx} variant="caption" style={{ fontWeight: progress >= (idx * 25) ? 700 : 400 }}>
-                                                        {label}
-                                                    </Typography>
-                                                ))}
-                                            </Box>
-                                            <LinearProgress variant="determinate" value={progress} color={processingStatus === 'completed' ? 'success' : 'primary'} />
-                                        </Box>
-                                    )}
-
                                     {loading ? (
                                         <Typography>Загрузка данных...</Typography>
                                     ) : viewMode === "json" && activeCategory !== "unknown" ? (
