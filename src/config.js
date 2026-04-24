@@ -1,11 +1,10 @@
+const isDev = process.env.NODE_ENV === "development";
 const host = window.location.hostname || "localhost";
-const hostApi = process.env.NODE_ENV === "development"
-  ? `http://${host}`
-  : "https://sing-generator-node.herokuapp.com";
-const portApi = process.env.NODE_ENV === "development" ? 8080 : "";
-const baseURLApi = `http://${host}:8081`;
-const manageApi = `http://${host}:8080`;
-const statsApi = `http://${host}:8083`;
+
+// В разработке (локально) ходим напрямую на порты, в продакшене — через NGINX
+const baseURLApi = isDev ? `http://${host}:8101` : `/api/auth`;
+const manageApi = isDev ? `http://${host}:8102` : `/api/manage`;
+const statsApi = isDev ? `http://${host}:8103` : `/api/stats`;
 
 export default {
   baseURLApi,
@@ -13,7 +12,7 @@ export default {
   statsApi,
   isBackend: true,
   auth: {
-    email: 'admin@flatlogic.com',
+    email: 'admin@masters.com',
     password: 'password',
   },
   app: {
