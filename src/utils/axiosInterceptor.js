@@ -62,7 +62,7 @@ const setupAxiosInterceptors = (store) => {
 
         try {
           // Вызываем refresh токен. Куки (refresh) уйдут автоматически
-          const res = await axios.post('/v1/refresh');
+          const res = await axios.post(`${config.baseURLApi}/v1/refresh`);
           const newAccessToken = res.data.access_token;
           
           setToken(newAccessToken);

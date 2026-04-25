@@ -237,7 +237,10 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
                 reconnectTimeout = setTimeout(connectWebSocket, 1000);
                 return;
             }
-            const wsUrl = config.manageApi.replace('http', 'ws') + `/v1/applicants/${id}/ws?token=${token}`;
+            const wsBase = config.manageApi.startsWith('http')
+                ? config.manageApi.replace(/^http/, 'ws')
+                : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${config.manageApi}`;
+            const wsUrl = wsBase + `/v1/applicants/${id}/ws?token=${token}`;
             socket = new WebSocket(wsUrl);
 
             socket.onmessage = (event) => {
