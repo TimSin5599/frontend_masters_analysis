@@ -36,7 +36,7 @@ export function doInit() {
     try {
       let currentUser = null;
       try {
-        const res = await axios.post('/v1/refresh');
+        const res = await axios.post(`${config.baseURLApi}/v1/refresh`);
         setToken(res.data.access_token);
         currentUser = await findMe();
       } catch (err) {
@@ -66,7 +66,7 @@ export function logoutUser() {
     dispatch({ type: LOGOUT_REQUEST });
 
     try {
-      await axios.post('/v1/logout');
+      await axios.post(`${config.baseURLApi}/v1/logout`);
     } catch (err) {
       console.log('Logout API error:', err);
     }

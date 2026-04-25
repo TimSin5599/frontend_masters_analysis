@@ -3,8 +3,6 @@ import { getToken, setToken, clearToken } from './tokenManager';
 import config from '../config';
 
 const setupAxiosInterceptors = (store) => {
-  // Настраиваем базовый URL и отправку кук (Credentials) для всех запросов
-  axios.defaults.baseURL = config.baseURLApi;
   axios.defaults.withCredentials = true;
 
   // Interceptor для добавления Bearer токена к каждому запросу
@@ -43,7 +41,7 @@ const setupAxiosInterceptors = (store) => {
       const originalRequest = err.config;
 
       // Если запрос был на /login или /refresh, и мы получили ошибку, просто прокидываем её дальше
-      if (originalRequest.url === '/v1/login' || originalRequest.url === '/v1/refresh') {
+      if (originalRequest.url?.includes('/v1/login') || originalRequest.url?.includes('/v1/refresh')) {
         return Promise.reject(err);
       }
 
