@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Box, Button, Grid, Paper, TextField, Typography, 
-    useTheme, Divider, Alert, CircularProgress 
+import {
+    Box, Button, Chip, Grid, Paper, TextField, Typography,
+    useTheme, Divider, Alert, CircularProgress
 } from "@mui/material";
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import axios from 'axios';
 import config from '../../../../config';
 
@@ -10,22 +11,37 @@ export default function ExpertEvaluationForm({ applicantId, currentUser, evaluat
     const theme = useTheme();
     const [localScores, setLocalScores] = useState({});
     const [localComments, setLocalComments] = useState({});
+    const [aiPrefilled, setAiPrefilled] = useState(new Set());
     const [isSaving, setIsSaving] = useState(false);
 
-    // Initial load from evaluations prop
+    // Initial load: prefer expert's own scores, fall back to AI drafts
     useEffect(() => {
-        if (evaluations && evaluations.length > 0) {
-            const scores = {};
-            const comments = {};
-            evaluations.forEach(e => {
-                if (String(e.expert_id) === String(currentUser?.id || currentUser?._id)) {
-                    scores[e.category] = e.score;
-                    comments[e.category] = e.comment;
-                }
-            });
-            setLocalScores(scores);
-            setLocalComments(comments);
-        }
+        if (!evaluations || evaluations.length === 0) return;
+        const scores = {};
+        const comments = {};
+        const aiCodes = new Set();
+
+        // 1. AI drafts as defaults
+        evaluations.forEach(e => {
+            if (e.is_ai_generated || e.expert_id === 'AI_SYSTEM') {
+                scores[e.category] = e.score;
+                comments[e.category] = e.comment;
+                aiCodes.add(e.category);
+            }
+        });
+
+        // 2. Expert's own scores override AI defaults
+        evaluations.forEach(e => {
+            if (String(e.expert_id) === String(currentUser?.id || currentUser?._id)) {
+                scores[e.category] = e.score;
+                comments[e.category] = e.comment;
+                aiCodes.delete(e.category);
+            }
+        });
+
+        setLocalScores(scores);
+        setLocalComments(comments);
+        setAiPrefilled(aiCodes);
     }, [evaluations, currentUser]);
 
     const isCompleted = (evaluations || []).some(e => 
@@ -36,6 +52,7 @@ export default function ExpertEvaluationForm({ applicantId, currentUser, evaluat
     const handleScoreChange = (category, score, maxScore) => {
         if (score === "") {
             setLocalScores(prev => ({ ...prev, [category]: "" }));
+            setAiPrefilled(prev => { const s = new Set(prev); s.delete(category); return s; });
             return;
         }
         const val = parseInt(score);
@@ -45,10 +62,12 @@ export default function ExpertEvaluationForm({ applicantId, currentUser, evaluat
             return;
         }
         setLocalScores(prev => ({ ...prev, [category]: val }));
+        setAiPrefilled(prev => { const s = new Set(prev); s.delete(category); return s; });
     };
 
     const handleCommentChange = (category, comment) => {
         setLocalComments(prev => ({ ...prev, [category]: comment }));
+        setAiPrefilled(prev => { const s = new Set(prev); s.delete(category); return s; });
     };
 
     const handleSave = (complete = false) => {
@@ -136,23 +155,33 @@ export default function ExpertEvaluationForm({ applicantId, currentUser, evaluat
                                         </Typography>
                                     </Box>
                                     
-                                    <Grid container spacing={2}>
+                                    <Grid container spacing={2} alignItems="center">
                                         <Grid item xs={2}>
-                                            <TextField 
+                                            <TextField
                                                 label="Балл"
-                                                type="number" 
-                                                size="small" 
+                                                type="number"
+                                                size="small"
                                                 fullWidth
                                                 disabled={isCompleted || isSaving}
                                                 value={localScores[cat.code] ?? ""}
                                                 onChange={(e) => handleScoreChange(cat.code, e.target.value, cat.max_score)}
                                                 inputProps={{ min: 0, max: cat.max_score }}
                                             />
+                                            {aiPrefilled.has(cat.code) && (
+                                                <Chip
+                                                    label="AI"
+                                                    icon={<SmartToyIcon />}
+                                                    size="small"
+                                                    color="info"
+                                                    variant="outlined"
+                                                    sx={{ mt: 1, height: 10, '& .MuiChip-label': { px: 0.5, fontSize: '0.65rem' } }}
+                                                />
+                                            )}
                                         </Grid>
                                         <Grid item xs={10}>
-                                            <TextField 
-                                                label="Комментарий (необязательно)" 
-                                                size="small" 
+                                            <TextField
+                                                label="Комментарий (необязательно)"
+                                                size="small"
                                                 fullWidth
                                                 disabled={isCompleted || isSaving}
                                                 value={localComments[cat.code] || ""}

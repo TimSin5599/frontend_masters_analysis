@@ -11,8 +11,8 @@ export function ExpertEvaluationsTab({
     allExperts, onRefreshSlots, onRefreshEvaluations, mode = 'summary',
     scoringScheme, onChangeScheme
 }) {
-    const role = String(currentUser?.role || "").toLowerCase();
-    const isAdmin = role === 'admin';
+    const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+    const isAdmin = userRoles.includes('admin');
 
     const mySlot = (expertSlots || []).find(s => String(s.user_id) === String(currentUser?.id || currentUser?._id || ""));
     const isExpertInSlots = !!mySlot;
@@ -98,8 +98,8 @@ export function ExpertEvaluationsTab({
                                                 {slot ? `${slot.firstName || slot.first_name || ''} ${slot.lastName || slot.last_name || ''}` : '(не назначен)'}
                                             </Typography>
                                             {slot && (
-                                                <Box 
-                                                    mt={1} px={1} py={0.5} borderRadius={1} 
+                                                <Box
+                                                    mt={1} px={1} py={0.5} borderRadius={1}
                                                     style={{ backgroundColor: statusColor, color: '#fff', fontSize: '0.75rem', fontWeight: 'bold' }}
                                                 >
                                                     {statusLabel}
@@ -108,6 +108,12 @@ export function ExpertEvaluationsTab({
                                         </th>
                                     );
                                 })}
+                                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
+                                    <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                                        <SmartToyIcon fontSize="small" sx={{ color: '#1976d2' }} />
+                                        <Typography variant="subtitle2" fontWeight="bold">AI (черновик)</Typography>
+                                    </Box>
+                                </th>
                                 <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Итого</th>
                             </tr>
                         </thead>
@@ -137,17 +143,19 @@ export function ExpertEvaluationsTab({
                                 // Initialize totals for the footer row
                                 const expertTotals = { 1: 0, 2: 0, 3: 0 };
                                 const expertCounts = { 1: 0, 2: 0, 3: 0 };
+                                let aiTotal = 0;
+                                let aiCount = 0;
                                 let combinedTotal = 0;
                                 let combinedCount = 0;
 
                                 const rows = sortedCats.map(cat => {
                                     let rowTotal = 0;
                                     let rowCount = 0;
-                                    
+
                                     const cells = [1, 2, 3].map(i => {
                                         const slot = (expertSlots || []).find(s => s.slot_number === i);
                                         const evalData = (evaluations || []).find(e => e.category === cat.code && e.expert_id === slot?.user_id);
-                                        
+
                                         if (evalData && evalData.score !== -1) {
                                             rowTotal += evalData.score;
                                             rowCount++;
@@ -173,7 +181,7 @@ export function ExpertEvaluationsTab({
                                                             </Typography>
                                                         )}
                                                         {evalData.comment && evalData.score !== -1 && (
-                                                            <Typography variant="caption" color="textSecondary" style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                                                            <Typography variant="caption" color="textSecondary" style={{ display: 'block', textAlign: 'left', wordBreak: 'break-word' }}>
                                                                 {evalData.comment}
                                                             </Typography>
                                                         )}
@@ -185,6 +193,31 @@ export function ExpertEvaluationsTab({
                                         );
                                     });
 
+                                    // AI column
+                                    const aiEval = (evaluations || []).find(e => e.category === cat.code && e.expert_id === 'AI_SYSTEM');
+                                    if (aiEval) {
+                                        aiTotal += aiEval.score;
+                                        aiCount++;
+                                    }
+                                    const aiCell = (
+                                        <td key="ai" style={{ border: '1px solid #ddd', padding: '12px', backgroundColor: 'rgba(25,118,210,0.04)' }}>
+                                            {aiEval ? (
+                                                <Box>
+                                                    <Typography variant="body1" fontWeight="bold" align="center" color="primary">
+                                                        {aiEval.score}
+                                                    </Typography>
+                                                    {aiEval.comment && (
+                                                        <Typography variant="caption" color="textSecondary" style={{ display: 'block', textAlign: 'left', wordBreak: 'break-word' }}>
+                                                            {aiEval.comment}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            ) : (
+                                                <Typography variant="body2" color="textSecondary" align="center">-</Typography>
+                                            )}
+                                        </td>
+                                    );
+
                                     const rowAvg = rowCount > 0 ? (rowTotal / rowCount) : 0;
                                     if (rowCount > 0) {
                                         combinedTotal += rowAvg;
@@ -195,6 +228,7 @@ export function ExpertEvaluationsTab({
                                         <tr key={cat.code}>
                                             <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>{cat.title}</td>
                                             {cells}
+                                            {aiCell}
                                             <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', backgroundColor: '#fafafa' }}>
                                                 <Typography variant="h6" color="primary">{rowCount > 0 ? rowAvg.toFixed(1) : '-'}</Typography>
                                             </td>
@@ -205,7 +239,7 @@ export function ExpertEvaluationsTab({
                                 // Add the Total row
                                 rows.push(
                                     <tr key="total_row" style={{ backgroundColor: '#f0f4f8' }}>
-                                        <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', textTransform: 'uppercase',textAlign: 'center' }}>Итого</td>
+                                        <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center' }}>Итого</td>
                                         {[1, 2, 3].map(i => (
                                             <td key={`total_${i}`} style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
                                                 <Typography variant="h6" fontWeight="bold">
@@ -213,6 +247,11 @@ export function ExpertEvaluationsTab({
                                                 </Typography>
                                             </td>
                                         ))}
+                                        <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', backgroundColor: 'rgba(25,118,210,0.08)' }}>
+                                            <Typography variant="h6" color="primary" fontWeight="bold">
+                                                {aiCount > 0 ? aiTotal : '-'}
+                                            </Typography>
+                                        </td>
                                         <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', backgroundColor: '#e3f2fd' }}>
                                             <Typography variant="h5" color="primary" fontWeight="bold">
                                                 {combinedCount > 0 ? combinedTotal.toFixed(1) : '-'}
@@ -244,8 +283,8 @@ export function ExpertScoreSection({
     const mySlot = (expertSlots || []).find(s => String(s.user_id) === String(currentUser?.id || currentUser?._id || ""));
     const isExpert = !!mySlot;
     
-    const role = String(currentUser?.role || "").toLowerCase();
-    const isAdmin = role === 'admin' || role === 'админ' || role === 'manager';
+    const userRoles2 = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+    const isAdmin = userRoles2.includes('admin') || userRoles2.includes('manager');
 
     // Filter relevant criteria for this category tab
     const relevantCriteria = (criteria || []).filter(c => {
@@ -405,45 +444,45 @@ export function ExpertScoreSection({
                                     )}
                                 </Box>
                             </Box>
+                            {aiSourcedCategories.has(cat.code) && !modifiedFromAI.has(cat.code) && (
+                                            <Box mb={1}>
+                                                <Chip
+                                                    label="AI"
+                                                    icon={<SmartToyIcon />}
+                                                    size="small"
+                                                    color="info"
+                                                    variant="outlined"
+                                                    sx={{ mt: -3, height: 20, '& .MuiChip-label': { px: 0.5, fontSize: '0.65rem' } }}
+                                                />
+                                            </Box>
+                                        )}
                             <Grid container spacing={2} alignItems="center">
                                 <Grid item xs={2}>
-                                    <Box>
-                                        <TextField
-                                            label="Балл"
-                                            type="number"
-                                            size="small"
-                                            fullWidth
-                                            disabled={isCompleted || isSaving}
-                                            value={localScores[cat.code] ?? ""}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val === "") {
-                                                    setLocalScores(prev => ({ ...prev, [cat.code]: "" }));
-                                                    setModifiedFromAI(prev => new Set([...prev, cat.code]));
-                                                    return;
-                                                }
-                                                const num = parseInt(val);
-                                                if (!isNaN(num) && num <= cat.max_score) {
-                                                    setLocalScores(prev => ({ ...prev, [cat.code]: num }));
-                                                    setModifiedFromAI(prev => new Set([...prev, cat.code]));
-                                                }
-                                            }}
-                                            inputProps={{ min: 0, max: cat.max_score }}
-                                        />
-                                        {aiSourcedCategories.has(cat.code) && !modifiedFromAI.has(cat.code) && (
-                                            <Chip
-                                                label="AI"
-                                                icon={<SmartToyIcon />}
-                                                size="small"
-                                                color="info"
-                                                variant="outlined"
-                                                sx={{ mt: 0.5, height: 20, '& .MuiChip-label': { px: 0.5, fontSize: '0.65rem' } }}
-                                            />
-                                        )}
-                                    </Box>
+                                    <TextField
+                                        label="Балл"
+                                        type="number"
+                                        size="small"
+                                        fullWidth
+                                        disabled={isCompleted || isSaving}
+                                        value={localScores[cat.code] ?? ""}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === "") {
+                                                setLocalScores(prev => ({ ...prev, [cat.code]: "" }));
+                                                setModifiedFromAI(prev => new Set([...prev, cat.code]));
+                                                return;
+                                            }
+                                            const num = parseInt(val);
+                                            if (!isNaN(num) && num <= cat.max_score) {
+                                                setLocalScores(prev => ({ ...prev, [cat.code]: num }));
+                                                setModifiedFromAI(prev => new Set([...prev, cat.code]));
+                                            }
+                                        }}
+                                        inputProps={{ min: 0, max: cat.max_score }}
+                                    />
                                 </Grid>
                                 <Grid item xs={8}>
-                                    <TextField 
+                                    <TextField
                                         label="Комментарий"
                                         size="small"
                                         fullWidth
@@ -456,9 +495,9 @@ export function ExpertScoreSection({
                                     />
                                 </Grid>
                                 <Grid item xs={2}>
-                                    <Button 
-                                        variant="contained" 
-                                        color="primary" 
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
                                         fullWidth
                                         size="small"
                                         disabled={isCompleted || isSaving}
