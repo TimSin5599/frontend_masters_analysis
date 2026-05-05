@@ -1,9 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getToken } from "../../../../utils/tokenManager";
 import config from '../../../../config';
 import { formatDateForStorage } from '../../../../utils/dateUtils';
 import { useUserState } from '../../../../context/UserContext';
+
+const CATEGORY_LABELS = {
+    passport: 'Паспорт', resume: 'Резюме', diploma: 'Диплом',
+    transcript: 'Приложение к диплому', second_diploma: 'Второй диплом',
+    prof_development: 'Проф. развитие', certification: 'Сертификация',
+    achievement: 'Достижение', recommendation: 'Рекомендация',
+    motivation: 'Мотивация', language: 'Сертификат АЯ',
+};
+
+const TERMINAL_STATUSES = new Set(['completed', 'classification_failed', 'extraction_failed', 'failed']);
 
 export const useApplicantDetails = (id, activeCategory, programId) => {
     const { currentUser } = useUserState();
@@ -25,6 +35,8 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
     const [applicantStatus, setApplicantStatus] = useState(null);
     const [notification, setNotification] = useState(null); // { message, severity }
     const [scoringScheme, setScoringSchemeState] = useState('default');
+
+    const prevDocsRef = useRef(null);
 
     const fetchApplicantStatus = useCallback(() => {
         axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=passport`)
@@ -59,7 +71,31 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
 
     const fetchDocuments = useCallback(() => {
         axios.get(`${config.manageApi}/v1/applicants/${id}/documents`)
-            .then(res => setDocuments(res.data))
+            .then(res => {
+                const newDocs = res.data || [];
+                const prev = prevDocsRef.current;
+                if (prev) {
+                    const prevMap = Object.fromEntries(prev.map(d => [d.id, d.status]));
+                    for (const doc of newDocs) {
+                        const oldStatus = prevMap[doc.id];
+                        if (oldStatus === doc.status) continue;
+                        if (!TERMINAL_STATUSES.has(doc.status)) continue;
+                        const baseCategory = (doc.file_type || '').split(':')[0];
+                        const catLabel = CATEGORY_LABELS[baseCategory] || baseCategory;
+                        if (doc.status === 'completed') {
+                            setNotification({ message: `Документ «${catLabel}» успешно обработан.`, severity: 'success' });
+                        } else if (doc.status === 'classification_failed') {
+                            setNotification({ message: `Не удалось классифицировать документ — выберите категорию вручную.`, severity: 'error' });
+                        } else if (doc.status === 'extraction_failed') {
+                            setNotification({ message: `Не удалось извлечь данные из «${catLabel}» — введите данные вручную.`, severity: 'error' });
+                        } else if (doc.status === 'failed') {
+                            setNotification({ message: `Ошибка обработки документа «${catLabel}».`, severity: 'error' });
+                        }
+                    }
+                }
+                prevDocsRef.current = newDocs;
+                setDocuments(newDocs);
+            })
             .catch(console.error);
     }, [id]);
 
@@ -124,8 +160,9 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
         if (!currentUser) return;
 
         const userId = currentUser?.id || currentUser?._id || "";
-        const role = String(currentUser?.role || "").toLowerCase();
-        
+        const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+        const role = userRoles.join(',');
+
         axios.get(`${config.manageApi}/v1/applicants/${id}/evaluations?user_id=${userId}&user_role=${role}`)
             .then(res => {
                 setEvaluations(res.data);
@@ -155,10 +192,10 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
     }, [id]);
 
     const updateScoringScheme = useCallback((newScheme) => {
-        const role = String(currentUser?.role || "").toLowerCase();
+        const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
         return axios.patch(`${config.manageApi}/v1/applicants/${id}/scoring-scheme`, {
             scheme: newScheme,
-            user_role: role,
+            user_role: userRoles.join(','),
         }).then(() => {
             setScoringSchemeState(newScheme === 'auto' ? 'default' : newScheme);
             fetchScoringScheme();
@@ -226,70 +263,86 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
         }
     }, [documents, activeCategory, personalDataDocType, activeSubTab, data]);
 
-    // WebSocket logic
+    // SSE logic for document processing status updates
     useEffect(() => {
-        let socket;
+        let es;
         let reconnectTimeout;
 
-        const connectWebSocket = () => {
+        const connect = () => {
             const token = getToken();
             if (!token || token === "null" || token === "undefined") {
-                reconnectTimeout = setTimeout(connectWebSocket, 1000);
+                reconnectTimeout = setTimeout(connect, 1000);
                 return;
             }
-            const wsBase = config.manageApi.startsWith('http')
-                ? config.manageApi.replace(/^http/, 'ws')
-                : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${config.manageApi}`;
-            const wsUrl = wsBase + `/v1/applicants/${id}/ws?token=${token}`;
-            socket = new WebSocket(wsUrl);
+            const url = `${config.manageApi}/v1/applicants/${id}/status/stream?token=${token}`;
+            es = new EventSource(url);
 
-            socket.onmessage = (event) => {
-                const msgData = JSON.parse(event.data);
+            es.onopen = () => {
+                // On every (re)connect refresh document list to catch any status
+                // updates that arrived while the SSE connection was down.
+                fetchDocuments();
+            };
 
-                // Авто-переход: все документы обработаны, статус изменился
-                if (msgData.event === 'status_changed' && msgData.status === 'verifying') {
-                    setApplicantStatus('verifying');
-                    setNotification({ message: 'Все документы проанализированы. Абитуриент передан на проверку.', severity: 'success' });
-                    return;
-                }
+            es.onmessage = (event) => {
+                try {
+                    const msgData = JSON.parse(event.data);
 
-                // Авто-переход: все документы обработаны, но не хватает обязательных
-                if (msgData.event === 'analysis_done') {
-                    setNotification({ message: `Анализ завершён. Не хватает документов: ${msgData.missing}`, severity: 'warning' });
-                    return;
-                }
-
-                if (msgData.category) {
-                    const baseCategory = msgData.category.split(':')[0]; // strip docType suffix
-                    if (msgData.status === 'completed') {
-                        updateProcessingState(baseCategory, 'completed', 100);
-                        fetchDocuments();
-                        if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
-                    } else if (msgData.status === 'classification_failed' || msgData.status === 'extraction_failed') {
-                        // Terminal error — refresh docs so the UI shows the persisted error status
-                        updateProcessingState(baseCategory, msgData.status, 0);
-                        fetchDocuments();
-                        if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
-                    } else if (msgData.status === 'failed') {
-                        // Legacy fallback
-                        updateProcessingState(baseCategory, 'extraction_failed', 0);
-                        fetchDocuments();
-                    } else {
-                        // In-flight statuses: classifying, classified, extracting, processing, saving
-                        updateProcessingState(baseCategory, 'processing', msgData.progress || 0);
+                    if (msgData.event === 'status_changed' && msgData.status === 'verifying') {
+                        setApplicantStatus('verifying');
+                        setNotification({ message: 'Все документы проанализированы. Абитуриент передан на проверку.', severity: 'success' });
+                        return;
                     }
+
+                    if (msgData.event === 'analysis_done') {
+                        setNotification({ message: `Анализ завершён. Не хватает документов: ${msgData.missing}`, severity: 'warning' });
+                        return;
+                    }
+
+                    if (msgData.category) {
+                        const baseCategory = msgData.category.split(':')[0];
+
+                        if (msgData.status === 'completed') {
+                            updateProcessingState(baseCategory, 'completed', 100);
+                            fetchDocuments();
+                            if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
+                        } else if (msgData.status === 'classification_failed') {
+                            updateProcessingState(baseCategory, 'classification_failed', 0);
+                            fetchDocuments();
+                            if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
+                        } else if (msgData.status === 'extraction_failed') {
+                            updateProcessingState(baseCategory, 'extraction_failed', 0);
+                            fetchDocuments();
+                            if (baseCategory === activeCategory || msgData.category === activeCategory) fetchData();
+                        } else if (msgData.status === 'failed') {
+                            updateProcessingState(baseCategory, 'extraction_failed', 0);
+                            fetchDocuments();
+                        } else if (msgData.status === 'pending' && msgData.error) {
+                            // failTask retry: task requeued after first failure — keep progress, don't reset
+                            updateProcessingState(baseCategory, 'processing', undefined);
+                            fetchDocuments();
+                        } else {
+                            updateProcessingState(baseCategory, 'processing', msgData.progress || 0);
+                            fetchDocuments();
+                        }
+                    }
+                } catch {
+                    // ignore parse errors
                 }
             };
 
-            socket.onclose = () => {
-                reconnectTimeout = setTimeout(connectWebSocket, 3000);
+            es.onerror = () => {
+                if (es.readyState === EventSource.CLOSED) {
+                    es = null;
+                    reconnectTimeout = setTimeout(connect, 3000);
+                }
+                // readyState CONNECTING = EventSource is auto-reconnecting, no action needed
             };
         };
 
-        connectWebSocket();
+        connect();
         return () => {
             clearTimeout(reconnectTimeout);
-            if (socket) socket.close();
+            if (es) es.close();
         };
     }, [id, activeCategory, updateProcessingState, fetchDocuments, fetchData]);
 
@@ -319,15 +372,14 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
     const handleSave = () => {
         let userMeta = {};
         if (currentUser) {
-            let roleLabel = 'оператор';
-            if (currentUser.role === 'admin')   roleLabel = 'админ';
-            if (currentUser.role === 'manager') roleLabel = 'менеджер';
-            if (currentUser.role === 'expert')  roleLabel = 'эксперт';
+            const roles = Array.isArray(currentUser.roles) ? currentUser.roles : (currentUser.role ? [currentUser.role] : []);
+            const roleLabels = roles.map(r => ({ admin: 'админ', manager: 'менеджер', expert: 'эксперт' }[r] || r));
+            const roleLabel = roleLabels.join(', ') || 'пользователь';
             userMeta = {
-                role:       roleLabel,
-                first_name: currentUser.firstName  || "",
-                last_name:  currentUser.lastName   || "",
-                patronymic: currentUser.patronymic || "",
+                role:            roleLabel,
+                first_name:      currentUser.firstName  || "",
+                last_name:       currentUser.lastName   || "",
+                user_patronymic: currentUser.patronymic || "",
             };
         }
 
@@ -399,16 +451,17 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
         return Promise.reject("Deletion cancelled");
     };
 
-    const uploadDocumentWithData = (file, docType = "") => {
+    const uploadDocumentWithData = (file, docType = "", explicitCategory = null) => {
         const formData = new FormData();
         formData.append('file', file);
-        const apiCategory = activeCategory === 'personal_data' ? docType : activeCategory;
+        const apiCategory = explicitCategory !== null
+            ? explicitCategory
+            : (activeCategory === 'personal_data' ? docType : activeCategory);
         formData.append('category', apiCategory);
-        // If we are uploading within personal_data, we already set the category to passport/resume.
-        // We don't necessarily need doc_type here if category is specific, but let's keep logic for consistency if docType is provided.
-        if (docType && activeCategory !== 'personal_data') formData.append('doc_type', docType);
+        if (docType && activeCategory !== 'personal_data' && explicitCategory === null) formData.append('doc_type', docType);
 
-        updateProcessingState(activeCategory, 'processing', 0);
+        const trackingCategory = explicitCategory !== null ? explicitCategory : activeCategory;
+        updateProcessingState(trackingCategory, 'processing', 0);
         axios.post(`${config.manageApi}/v1/applicants/${id}/documents`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         })
@@ -419,7 +472,7 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
                 fetchDocuments();
             }
         })
-        .catch(err => { console.error(err); alert("Ошибка при загрузке документа"); updateProcessingState(activeCategory, null); });
+        .catch(err => { console.error(err); alert("Ошибка при загрузке документа"); updateProcessingState(trackingCategory, null); });
     };
 
     const confirmRescan = (docId) => {
@@ -430,19 +483,23 @@ export const useApplicantDetails = (id, activeCategory, programId) => {
 
         updateProcessingState(activeCategory, 'processing', 0);
 
+        const onSuccess = () => fetchDocuments();
+        const onError = (err) => { console.error(err); updateProcessingState(activeCategory, null); };
+
         if (targetId) {
             axios.post(`${config.manageApi}/v1/documents/${targetId}/reprocess`)
-                .catch(err => { console.error(err); updateProcessingState(activeCategory, null); });
+                .then(onSuccess).catch(onError);
         } else {
             axios.post(`${config.manageApi}/v1/applicants/${id}/documents/reprocess?category=${activeCategory}`)
-                .catch(err => { console.error(err); updateProcessingState(activeCategory, null); });
+                .then(onSuccess).catch(onError);
         }
     };
 
     const transferToExperts = () => {
         setLoading(true);
-        const userName = [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(' ') || currentUser?.email || '';
-        const userRole = currentUser?.role || '';
+        const userName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') || currentUser?.email || '';
+        const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+        const userRole = userRoles.join(', ');
         axios.post(`${config.manageApi}/v1/applicants/${id}/transfer-to-experts`, { user_name: userName, user_role: userRole })
             .then(() => {
                 alert("Абитуриент успешно передан экспертам");

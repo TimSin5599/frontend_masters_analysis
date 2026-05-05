@@ -1,10 +1,9 @@
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import CodeIcon from '@mui/icons-material/Code';
-import PendingIcon from '@mui/icons-material/Pending';
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Grid, IconButton, LinearProgress, Paper, Snackbar, Tab, Tabs, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Grid, IconButton, Paper, Snackbar, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHistory, useLocation, useParams } from "react-router-dom";
 import config from "../../../config";
 
@@ -24,6 +23,7 @@ import DocumentsSection from "./components/DocumentsSection";
 // hook
 import { useApplicantDetails } from "./hooks/useApplicantDetails";
 import { getToken } from "../../../utils/tokenManager";
+import { hasRole } from "../../../utils/roles";
 
 export default function ApplicantDetails() {
     const { id } = useParams();
@@ -37,6 +37,8 @@ export default function ApplicantDetails() {
     const [activeCategory, setActiveCategory] = useState("personal_data");
     const [activeMainTab, setActiveMainTab] = useState("info");
     const [viewMode, setViewMode] = useState("form"); // "form" or "json"
+    const [videoUrl, setVideoUrl] = useState(null);
+    const [isProgramCompleted, setIsProgramCompleted] = useState(false);
 
     const {
         applicantName,
@@ -47,7 +49,6 @@ export default function ApplicantDetails() {
         activeDocumentId, setActiveDocumentId,
         documents,
         personalDataDocType, setPersonalDataDocType,
-        processingStatus, progress,
         uploadTypeDialogOpen, setUploadTypeDialogOpen,
         pendingFile, setPendingFile,
         evaluations, fetchEvaluations,
@@ -119,6 +120,47 @@ export default function ApplicantDetails() {
         return (documents || []).some(d => types.includes(d.file_type) && ERROR_STATUSES.has(d.status));
     };
 
+    useEffect(() => {
+        axios.get(`${config.manageApi}/v1/applicants/${id}/data?category=video_presentation`)
+            .then(res => setVideoUrl(res.data?.video_url || null))
+            .catch(() => setVideoUrl(null));
+    }, [id]);
+
+    useEffect(() => {
+        if (!programId) return;
+        axios.get(`${config.manageApi}/v1/programs/${programId}`)
+            .then(res => setIsProgramCompleted(res.data?.status === 'completed'))
+            .catch(() => {});
+    }, [programId]);
+
+    // Don't evaluate missing docs while any document is still being classified —
+    // the system hasn't finished determining what was uploaded yet.
+    const CLASSIFYING_STATUSES = new Set(['pending', 'classifying']);
+    const hasUnclassifiedDocs = (documents || []).some(d => CLASSIFYING_STATUSES.has(d.status));
+
+    const uploadedDocTypes = new Set((documents || []).map(d => d.file_type));
+    const missingDocTypes = [];
+    if (!hasUnclassifiedDocs) {
+        (criteria || []).filter(c => c.is_mandatory).forEach(criterion => {
+            const docTypes = criterion.document_types || [];
+            if (docTypes.length === 0) return;
+
+            // video_presentation: check URL, not documents
+            if (docTypes.includes('video_presentation')) {
+                if (!videoUrl) missingDocTypes.push('video_presentation');
+                return;
+            }
+
+            // All other criteria: satisfied if ANY of the doc types is uploaded
+            const hasAny = docTypes.some(dt => uploadedDocTypes.has(dt));
+            if (!hasAny) {
+                docTypes.forEach(dt => {
+                    if (!missingDocTypes.includes(dt)) missingDocTypes.push(dt);
+                });
+            }
+        });
+    }
+
     const activeCatKey = ['second_diploma', 'prof_development', 'certification'].includes(activeCategory)
         ? 'additional_edu'
         : activeCategory;
@@ -138,6 +180,66 @@ export default function ApplicantDetails() {
         }
     };
 
+    const isExpertAssigned = expertSlots.some(s => String(s.user_id) === String(currentUser?.id || currentUser?._id));
+
+    // Права по ролям (union при мультироли)
+    const canUpload   = hasRole(currentUser, 'manager');
+    const canEdit     = hasRole(currentUser, 'expert');
+    const canDeleteApplicant   = hasRole(currentUser, 'manager');
+    const canTransfer = hasRole(currentUser, 'expert');
+
+    const statusGuideMap = {
+        uploaded: {
+            severity: 'info',
+            title: 'Этап: Создан',
+            description: () => {
+                if (canUpload)
+                    return 'Загрузите документы абитуриента во вкладке «Документы». ИИ автоматически обработает их и заполнит поля данных.';
+                if (canEdit)
+                    return 'Ожидайте загрузки документов менеджером.';
+                return 'Абитуриент создан. Оценка будет доступна после завершения обработки документов.';
+            },
+        },
+        processing: {
+            severity: 'warning',
+            title: 'Этап: Обработка ИИ',
+            description: () => {
+                if (canUpload)
+                    return 'ИИ извлекает данные из загруженных документов. После завершения обработки передайте абитуриента эксперту.';
+                if (canEdit)
+                    return 'Документы обрабатываются ИИ. После завершения проверьте корректность данных и нажмите «Передать на оценивание».';
+                return 'Документы абитуриента обрабатываются. Оценка будет доступна после завершения.';
+            },
+        },
+        verifying: {
+            severity: 'warning',
+            title: 'Этап: Проверка данных',
+            description: () => {
+                if (canEdit)
+                    return 'Проверьте корректность данных, извлечённых ИИ, по каждой вкладке категорий. При необходимости отредактируйте поля вручную. После проверки нажмите «Передать на оценивание».';
+                return 'Данные абитуриента проверяются экспертом. Оценка будет доступна после завершения проверки.';
+            },
+        },
+        assessed: {
+            severity: 'info',
+            title: 'Этап: Оценивание экспертами',
+            description: () => {
+                if (canEdit) {
+                    return isExpertAssigned
+                        ? 'Вы назначены для оценки этого абитуриента. Перейдите во вкладку «Оценка эксперта» и выставьте баллы по всем критериям.'
+                        : 'Вы не назначены для оценки этого абитуриента. Результаты доступны в «Сводной таблице».';
+                }
+                return 'Абитуриент передан экспертам. Ожидайте завершения оценивания. Промежуточные результаты доступны в «Сводной таблице».';
+            },
+        },
+        completed: {
+            severity: 'success',
+            title: 'Этап: Оценивание завершено',
+            description: () => 'Все оценки выставлены. Итоговые результаты доступны в «Сводной таблице».',
+        },
+    };
+    const activeGuide = statusGuideMap[applicantStatus];
+
     return (
         <>
             <PageTitle
@@ -151,18 +253,29 @@ export default function ApplicantDetails() {
                             sx={{ fontWeight: 'bold', mr: 2 }} 
                         />
                         
-                        {applicantStatus === 'verifying' && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+                        {!isProgramCompleted && applicantStatus === 'verifying' && canTransfer && (
                             <Button variant="contained" color="success" onClick={transferToExperts}>
-                                Передать экспертам
+                                Передать на оценивание
                             </Button>
                         )}
 
-                        <Button variant="contained" color="error" onClick={handleDeleteApplicant}>
-                            Удалить абитуриента
-                        </Button>
+                        {canDeleteApplicant && (
+                            <Button variant="contained" color="error" onClick={handleDeleteApplicant} disabled={isProgramCompleted}>
+                                Удалить абитуриента
+                            </Button>
+                        )}
                     </Box>
                 }
             />
+            {activeGuide && (
+                <Box mb={1}>
+                    <Alert severity={activeGuide.severity} sx={{ py: 0.75, alignItems: 'center' }}>
+                        <Typography variant="body2">
+                            <strong>{activeGuide.title}</strong>&nbsp;—&nbsp;{activeGuide.description()}
+                        </Typography>
+                    </Alert>
+                </Box>
+            )}
             <Box mb={1} borderBottom={1} borderColor="divider">
                 <Tabs
                     value={activeMainTab}
@@ -173,7 +286,9 @@ export default function ApplicantDetails() {
                     <Tab label="Информация" value="info" />
                     <Tab
                         label={
-                            (documents || []).some(d => d.status === 'classification_failed' || d.file_type === 'unknown')
+                            missingDocTypes.length > 0
+                            ? <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>Документы ⚠</span>
+                            : (documents || []).some(d => d.status === 'classification_failed' || d.file_type === 'unknown')
                             ? <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>Документы ⚠</span>
                             : (documents || []).some(d => ERROR_STATUSES.has(d.status))
                             ? <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>Документы ✗</span>
@@ -183,35 +298,54 @@ export default function ApplicantDetails() {
                         }
                         value="unknown"
                     />
-                    {expertSlots.some(s => String(s.user_id) === String(currentUser?.id || currentUser?._id)) && (
+                    {isExpertAssigned && (
                         <Tab label="Оценка эксперта" value="evaluation_form" />
                     )}
                     <Tab label="Сводная таблица" value="evaluation_summary" />
                 </Tabs>
             </Box>
             <Grid container spacing={2} style={{ height: "calc(100vh - 200px)" }}>
-                {/* Left Side: Document Viewer - Hidden when in evaluation tabs */}
-                {activeMainTab === 'info' && (
-                    <Grid item xs={6}>
-                        <Paper elevation={3} style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                            <Box p={1.5} bgcolor="primary.main" color="white">
-                                <Typography variant="h6">Оригинал документа</Typography>
-                            </Box>
-                            <iframe
-                                key={activeDocumentId || activeCategory}
-                                src={activeDocumentId
-                                    ? `${config.manageApi}/v1/documents/${activeDocumentId}/view?token=${getToken()}#view=FitV`
-                                    : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory === 'personal_data' ? personalDataDocType : activeCategory}${activeCategory === 'personal_data' ? `&doc_type=${personalDataDocType}` : ''}&token=${getToken()}#view=FitV`}
-                                width="100%"
-                                height="100%"
-                                title="Document Viewer"
-                                style={{ border: "none", flexGrow: 1 }}
-                            />
-                        </Paper>
-                    </Grid>
-                )}
+                {/* Left Side: Document Viewer - Hidden when in evaluation tabs or video_presentation */}
+                {activeMainTab === 'info' && activeCategory !== 'video_presentation' && (() => {
+                    // Check if there's a document to display for the active category
+                    const multiRecordCategories = ['prof_development', 'second_diploma', 'certification', 'achievement', 'recommendation'];
+                    let docExists;
+                    if (multiRecordCategories.includes(activeCategory)) {
+                        docExists = Array.isArray(data) && data[activeSubTab]?.document_id != null;
+                    } else {
+                        const types = categoryDocTypes[activeCatKey] || [];
+                        docExists = activeDocumentId != null || (documents || []).some(d => types.includes(d.file_type));
+                    }
+                    return (
+                        <Grid item xs={6}>
+                            <Paper elevation={3} style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                                <Box p={1.5} bgcolor="primary.main" color="white">
+                                    <Typography variant="h6">Оригинал документа</Typography>
+                                </Box>
+                                {docExists ? (
+                                    <iframe
+                                        key={activeDocumentId || activeCategory}
+                                        src={activeDocumentId
+                                            ? `${config.manageApi}/v1/documents/${activeDocumentId}/view?token=${getToken()}#view=FitV`
+                                            : `${config.manageApi}/v1/applicants/${id}/documents/view?category=${activeCategory === 'personal_data' ? personalDataDocType : activeCategory}${activeCategory === 'personal_data' ? `&doc_type=${personalDataDocType}` : ''}&token=${getToken()}#view=FitV`}
+                                        width="100%"
+                                        height="100%"
+                                        title="Document Viewer"
+                                        style={{ border: "none", flexGrow: 1 }}
+                                    />
+                                ) : (
+                                    <Box display="flex" alignItems="center" justifyContent="center" flexGrow={1} flexDirection="column" gap={1} p={3}>
+                                        <Typography variant="body2" color="textSecondary" textAlign="center">
+                                            В данной категории нет документов для отображения.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Paper>
+                        </Grid>
+                    );
+                })()}
 
-                <Grid item xs={activeMainTab === 'info' ? 6 : 12} sx={{ height: '100%' }}>
+                <Grid item xs={activeMainTab !== 'info' ? 12 : activeCategory === 'video_presentation' ? 12 : 6} sx={{ height: '100%' }}>
                     <Paper elevation={3} style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                         {activeMainTab === 'info' && (
                             <>
@@ -299,7 +433,7 @@ export default function ApplicantDetails() {
                                     {['second_diploma', 'prof_development', 'certification'].includes(activeCategory) && (
                                         <Box borderBottom={1} borderColor="divider" mb={2} display="flex" justifyContent="center">
                                             <Tabs value={activeCategory} onChange={(e, val) => setActiveCategory(val)} centered>
-                                                <Tab label="Второй диплом" value="second_diploma" />
+                                                <Tab label="Доп. диплом" value="second_diploma" />
                                                 <Tab label="Проф. развитие" value="prof_development" />
                                                 <Tab label="Сертификация" value="certification" />
                                             </Tabs>
@@ -346,7 +480,7 @@ export default function ApplicantDetails() {
                                                                             item.record_type === 'training' ? 'Повышение квалификац.' : item.record_type}
                                                                 </span>
                                                             )}
-                                                            {activeSubTab === index && (
+                                                            {activeSubTab === index && !isProgramCompleted && canEdit && (
                                                                 <IconButton
                                                                     size="small"
                                                                     component="span"
@@ -362,7 +496,7 @@ export default function ApplicantDetails() {
                                                         </div>
                                                     } value={index} />
                                                 ))}
-                                                <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />
+                                                {!isProgramCompleted && canUpload && <Tab icon={<AddIcon />} label="Добавить" value="add" style={{ minHeight: '48px', flexDirection: 'row', gap: '8px' }} />}
                                             </Tabs>
                                         </Box>
                                     )}
@@ -381,11 +515,10 @@ export default function ApplicantDetails() {
                                         </Tooltip>
                                     </Box>
 
-                                    {activeCategoryIsProcessing && !processingStatus && (
-                                        <Box mb={2} p={1.5} display="flex" alignItems="center" gap={1} sx={{ bgcolor: 'rgba(249,168,37,0.1)', border: '1px solid #f9a825', borderRadius: 1 }}>
-                                            <PendingIcon sx={{ color: '#f9a825', flexShrink: 0 }} />
-                                            <Typography variant="body2" sx={{ color: '#f57f17', fontWeight: 500 }}>
-                                                Документ находится в обработке ИИ — статус: <strong>Анализ</strong>. Данные появятся автоматически после завершения.
+                                    {isProgramCompleted && (
+                                        <Box mb={2} p={1.5} display="flex" alignItems="center" gap={1} sx={{ bgcolor: 'rgba(46,125,50,0.07)', border: '1px solid rgba(46,125,50,0.4)', borderRadius: 1 }}>
+                                            <Typography variant="body2" sx={{ color: '#1b5e20', fontWeight: 500 }}>
+                                                Образовательная программа завершена — редактирование и управление недоступны.
                                             </Typography>
                                         </Box>
                                     )}
@@ -564,11 +697,12 @@ export default function ApplicantDetails() {
                                 </Box>
 
                                 <Divider />
-                                <Box p={2} display="flex" justifyContent={(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing ? "space-between" : "flex-end"} alignItems="center">
-                                    {(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing && (
+                                <Box p={2} display="flex" justifyContent={(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing && canUpload ? "space-between" : "flex-end"} alignItems="center">
+                                    {(['personal_data', 'diploma', 'transcript', 'achievement', 'recommendation'].includes(activeCategory)) && !isEditing && canUpload && (
                                         <Button
                                             variant="outlined"
                                             color="error"
+                                            disabled={isProgramCompleted}
                                             onClick={() => {
                                                 if (activeDocumentId) handleDeleteDocument(activeDocumentId);
                                                 else alert("Нет активного документа для удаления");
@@ -585,8 +719,8 @@ export default function ApplicantDetails() {
                                             </>
                                         ) : (
                                             <>
-                                                <Button variant="outlined" onClick={() => confirmRescan()}>Повторить сканирование</Button>
-                                                {(currentUser?.role !== 'operator' || applicantStatus === 'verifying') && (
+                                                {canUpload && <Button variant="outlined" disabled={isProgramCompleted} onClick={() => confirmRescan()}>Повторить сканирование</Button>}
+                                                {!isProgramCompleted && canEdit && (
                                                     <Button variant="contained" color="primary" onClick={() => setIsEditing(true)}>Редактировать</Button>
                                                 )}
                                             </>
@@ -608,6 +742,13 @@ export default function ApplicantDetails() {
                                     onManualEntry={(docId) =>
                                         history.push(`/app/applicants/${id}/documents/${docId}/manual-entry${programId ? `?program_id=${programId}` : ""}`)
                                     }
+                                    missingDocTypes={missingDocTypes}
+                                    onUpload={(file, docType) => uploadDocumentWithData(file, '', docType || 'unknown')}
+                                    onNavigateToVideo={() => {
+                                        setActiveMainTab('info');
+                                        setActiveCategory('video_presentation');
+                                    }}
+                                    canUpload={canUpload}
                                 />
                             </Box>
                         )}

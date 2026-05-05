@@ -104,7 +104,8 @@ export default function AddApplicant() {
 
             // 2. Save video URL if provided
             if (form.video_url) {
-                const roleLabel = currentUser?.role === 'admin' ? 'админ' : (currentUser?.role || 'админ');
+                const roles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+                const roleLabel = roles.map(r => ({ admin: 'админ', manager: 'менеджер', expert: 'эксперт' }[r] || r)).join(', ') || 'менеджер';
                 await axios.patch(`${config.manageApi}/v1/applicants/${applicantId}/data?category=video_presentation`, {
                     video_url: form.video_url,
                     role: roleLabel,

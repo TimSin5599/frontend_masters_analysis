@@ -9,10 +9,13 @@ import config from "../../config";
 import PageTitle from "../../components/PageTitle/PageTitle";
 import { StatusChip, CustomFilterList, StatusLegend, statusMap } from "./components/StatusComponents";
 import ApplicantTableFilter from "./components/ApplicantTableFilter";
+import { useUserState } from "../../context/UserContext";
+import { hasRole } from "../../utils/roles";
 
 export default function ApplicantsPage() {
     const [applicants, setApplicants] = useState([]);
     const { programId } = useParams();
+    const { currentUser } = useUserState();
 
     const fetchApplicants = useCallback(() => {
         const url = programId
@@ -132,7 +135,7 @@ export default function ApplicantsPage() {
         <>
             <PageTitle
                 title="Абитуриенты"
-                button="Добавить абитуриента"
+                button={hasRole(currentUser, 'manager') ? "Добавить абитуриента" : null}
                 onClick={() => {
                     const link = programId
                         ? `#/app/applicants/new?program_id=${programId}`
