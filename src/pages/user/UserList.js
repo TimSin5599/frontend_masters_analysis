@@ -80,23 +80,23 @@ function stableSort(array, comparator) {
 
 const headCells = [
     { id: 'id', numeric: true, disablePadding: true, label: 'ID' },
-    { id: 'name', numeric: true, disablePadding: false, label: 'NAME' },
-    { id: 'role', numeric: true, disablePadding: false, label: 'ROLE' },
+    { id: 'name', numeric: true, disablePadding: false, label: 'ИМЯ' },
+    { id: 'role', numeric: true, disablePadding: false, label: 'РОЛЬ' },
     {
         id: 'companyName',
         numeric: true,
         disablePadding: false,
-        label: 'COMPANY NAME',
+        label: 'КОМПАНИЯ',
     },
     { id: 'email', numeric: true, disablePadding: false, label: 'EMAIL' },
-    { id: 'status', numeric: true, disablePadding: false, label: 'STATUS' },
+    { id: 'status', numeric: true, disablePadding: false, label: 'СТАТУС' },
     {
         id: 'created',
         numeric: false,
         disablePadding: false,
-        label: 'CREATED AT',
+        label: 'СОЗДАН',
     },
-    { id: 'actions', numeric: true, disablePadding: false, label: 'ACTIONS' },
+    { id: 'actions', numeric: true, disablePadding: false, label: 'ДЕЙСТВИЯ' },
 ]
 
 function EnhancedTableHead(props) {
@@ -173,11 +173,10 @@ const UserList = () => {
 
     const handleDelete = () => {
         actions.doDelete(managementValue.idToDelete)(managementDispatch);
-        sendNotification('User deleted')
+        sendNotification('Пользователь удалён')
     }
 
     React.useEffect(() => {
-        sendNotification('This page is only available in React Material Admin Full with Node.js integration!')
         async function fetchAPI() {
             try {
                 await actions.doFetch({}, false)(managementDispatch);
@@ -285,11 +284,11 @@ const UserList = () => {
                 aria-labelledby="scroll-dialog-title"
             >
                 <DialogTitle id="alert-dialog-title">
-                    Are you sure that you want to delete user?
+                    Вы уверены, что хотите удалить пользователя?
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText id="alert-dialog-description">
-                        User will be deleted.
+                        Пользователь будет удалён без возможности восстановления.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
@@ -297,14 +296,14 @@ const UserList = () => {
                         onClick={closeModal}
                         color="primary"
                     >
-                        Disagree
+                        Отмена
                     </Button>
                     <Button
                         onClick={handleDelete}
                         color="primary"
                         autoFocus
                     >
-                        Agree
+                        Удалить
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -328,7 +327,7 @@ const UserList = () => {
                                             <Box mr={1} display={'flex'}>
                                                 <AddIcon />
                                             </Box>
-                                            Add
+                                            Добавить
                                         </Button>
                                     </Link>
                                 </Box>
@@ -341,12 +340,12 @@ const UserList = () => {
                                         <Box display={'flex'} mr={1}>
                                             <DownloadIcon />
                                         </Box>
-                                        Download
+                                        Скачать
                                     </Button>
                                     <Input
                                         style={{ marginTop: 16 }}
                                         id="search-field"
-                                        label="Search"
+                                        label="Поиск"
                                         margin="dense"
                                         variant="outlined"
                                         onChange={e => handleSearch(e)}
@@ -482,7 +481,7 @@ const UserList = () => {
                                                                 color={
                                                                     row.statusColor
                                                                 }
-                                                                label={(row.emailVerified && row.password) ? 'active' : 'inactive'}
+                                                                label={(row.emailVerified && row.password) ? 'активен' : 'неактивен'}
                                                                 style={{
                                                                     color: '#fff',
                                                                     height: 16,
@@ -509,13 +508,15 @@ const UserList = () => {
                                                             >
                                                                 <IconButton
                                                                     color={'primary'}
+                                                                    title="Редактировать"
                                                                 >
-                                                                    <Link href={`#app/user/${row.id}/edit`} color="#fff">
+                                                                    <Link href={`#/app/users/${row.id}/edit`} color="#fff">
                                                                         <CreateIcon />
                                                                     </Link>
                                                                 </IconButton>
                                                                 <IconButton
                                                                     color={'primary'}
+                                                                    title="Подробнее"
                                                                 >
                                                                     <Link href={`#app/user/${row.id}`} color="#fff">
                                                                         <HelpIcon />
@@ -524,6 +525,7 @@ const UserList = () => {
                                                                 <IconButton
                                                                     onClick={() => openModal(row.id)}
                                                                     color={'primary'}
+                                                                    title="Удалить"
                                                                 >
                                                                     <DeleteIcon />
                                                                 </IconButton>

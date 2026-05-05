@@ -1,48 +1,26 @@
 const usersFields = {
   id: { type: 'id', label: 'ID' },
 
-  firstName: { type: 'string', label: 'First Name', required: true },
+  firstName: { type: 'string', label: 'Имя', required: true },
 
-  lastName: { type: 'string', label: 'Last Name', required: true },
+  lastName: { type: 'string', label: 'Фамилия', required: true },
 
-  phoneNumber: { type: 'string', label: 'Phone Number' },
+  phoneNumber: { type: 'string', label: 'Телефон' },
 
-  email: { type: 'string', label: 'E-Mail', required: true },
+  email: { type: 'string', label: 'Email', required: true },
 
-  role: {
-    type: 'enum',
-    label: 'Role',
+  roles: {
+    type: 'stringArray',
+    label: 'Роли',
     required: true,
-
     options: [
-      { value: 'admin', label: 'Admin' },
-      { value: 'manager', label: 'Manager' },
-      { value: 'expert', label: 'Expert' },
-      { value: 'operator', label: 'Operator' },
+      { value: 'admin',   label: 'Администратор' },
+      { value: 'manager', label: 'Менеджер' },
+      { value: 'expert',  label: 'Эксперт' },
     ],
   },
 
-  avatar: { type: 'images', label: 'Avatar' },
-
-  password: { type: 'string', label: 'Password', required: true },
-
-  emailVerified: { type: 'boolean', label: 'Email Verified' },
-
-  emailVerificationToken: { type: 'string', label: 'Email Verification Token' },
-
-  emailVerificationTokenExpiresAt: {
-    type: 'datetime',
-    label: 'Email Verification Token Expires At',
-  },
-
-  passwordResetToken: { type: 'string', label: 'Password Reset Token' },
-
-  passwordResetTokenExpiresAt: {
-    type: 'datetime',
-    label: 'Password Reset Token Expires At',
-  },
-
-  provider: { type: 'string', label: 'Provider' },
+  password: { type: 'string', label: 'Пароль', required: true },
 };
 
 export default usersFields;

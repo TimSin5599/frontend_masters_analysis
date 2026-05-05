@@ -35,13 +35,13 @@ import config from '../../config';
 const getGreeting = () => {
   const d = new Date();
   if (d.getHours() >= 4 && d.getHours() <= 12) {
-    return 'Good Morning';
+    return 'Доброе утро';
   } else if (d.getHours() >= 13 && d.getHours() <= 16) {
-    return 'Good Day';
+    return 'Добрый день';
   } else if (d.getHours() >= 17 && d.getHours() <= 23) {
-    return 'Good Evening';
+    return 'Добрый вечер';
   } else {
-    return 'Good Night';
+    return 'Доброй ночи';
   }
 };
 
@@ -92,8 +92,8 @@ function Login(props) {
     <Grid container className={classes.container}>
       <div className={classes.logotypeContainer}>
         <img src={logo} alt='logo' className={classes.logotypeImage} />
-        <Typography className={classes.logotypeText}>
-          Intelligent analysis of system and software engineering portfolios
+        <Typography sx={{ fontSize: '3rem', textAlign: 'center', color: 'white' }}>
+            Система интеллектуального анализа портфолио абитуриентов для приёма в магистратуру
         </Typography>
       </div>
       <div
@@ -201,7 +201,7 @@ function Login(props) {
                       }
                     >
                       <Typography className={classes.errorMessage}>
-                        Something is wrong with your login or password :(
+                        Логин или пароль введены некорректно
                       </Typography>
                     </Grow>
                     <Input
@@ -259,7 +259,7 @@ function Login(props) {
                           color='primary'
                           size='large'
                         >
-                          Login
+                          Войти
                         </Button>
                       )}
                       <Button
@@ -268,7 +268,7 @@ function Login(props) {
                         onClick={() => setIsForgot(!isForgot)}
                         className={classes.forgetButton}
                       >
-                        Forgot Password?
+                        Забыли пароль?
                       </Button>
                     </div>
                   </div>

@@ -172,7 +172,7 @@ function signOut(dispatch, history) {
   localStorage.removeItem('cPwdH');
   localStorage.setItem('isLoggedIn', 'false');
   clearToken();
-  axios.post('/v1/logout').catch(() => {});
+  axios.post(`${config.baseURLApi}/v1/logout`).catch(() => {});
   
   dispatch({ type: 'SIGN_OUT_SUCCESS' });
   history.push('/login');

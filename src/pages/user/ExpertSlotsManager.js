@@ -56,7 +56,8 @@ const ExpertSlotsManager = () => {
 
     const handleSlotChange = (slotNumber, userId) => {
         const currentUser = JSON.parse(localStorage.getItem("user"));
-        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+        if (!currentUser || (!userRoles.includes('admin') && !userRoles.includes('manager'))) {
             alert("Только администратор или менеджер может менять слоты экспертов");
             return;
         }

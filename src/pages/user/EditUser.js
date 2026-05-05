@@ -88,7 +88,7 @@ const EditUser = () => {
       data,
       history,
     )(managementDispatch);
-    showSnackbar({ type: 'success', message: 'User Edited' });
+    showSnackbar({ type: 'success', message: 'Данные пользователя обновлены' });
   }
 
   async function handleUpdatePassword() {
@@ -328,7 +328,7 @@ const EditUser = () => {
                     weight={'medium'}
                     style={{ marginBottom: 35 }}
                   >
-                    Settings
+                    Настройки
                   </Typography>
                   <FormControl variant='outlined' style={{ marginBottom: 35 }}>
                     <Select
@@ -336,12 +336,12 @@ const EditUser = () => {
                       id='demo-simple-select-outlined'
                       value={10}
                     >
-                      <MenuItem value={10}>English</MenuItem>
-                      <MenuItem value={20}>Admin</MenuItem>
-                      <MenuItem value={30}>Super Admin</MenuItem>
+                      <MenuItem value={10}>Русский</MenuItem>
+                      <MenuItem value={20}>Администратор</MenuItem>
+                      <MenuItem value={30}>Суперадминистратор</MenuItem>
                     </Select>
                   </FormControl>
-                  <Typography weight={'bold'}>Communication:</Typography>
+                  <Typography weight={'bold'}>Коммуникации:</Typography>
                   <Box display={'flex'}>
                     <FormControlLabel
                       control={
@@ -351,22 +351,22 @@ const EditUser = () => {
                     />
                     <FormControlLabel
                       control={<Checkbox name='checkedB' color='secondary' />}
-                      label='Messages'
+                      label='Сообщения'
                     />
                     <FormControlLabel
                       control={<Checkbox name='checkedB' color='secondary' />}
-                      label='Phone'
+                      label='Телефон'
                     />
                   </Box>
                   <Box display={'flex'} mt={2} alignItems={'center'}>
                     <Typography weight={'medium'}>
-                      Email notification
+                      Email-уведомления
                     </Typography>
                     <Switch color={'primary'} checked />
                   </Box>
                   <Box display={'flex'} mt={2} mb={2} alignItems={'center'}>
                     <Typography weight={'medium'}>
-                      Send copy to personal email
+                      Отправлять копию на личный email
                     </Typography>
                     <Switch color={'primary'} />
                   </Box>

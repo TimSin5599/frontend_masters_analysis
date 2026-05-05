@@ -123,7 +123,7 @@ const UsersTable = () => {
     },
 
     {
-      field: 'phoneNumber',
+      field: 'phone',
 
       flex: 0.6,
 
@@ -139,26 +139,19 @@ const UsersTable = () => {
     },
 
     {
-      field: 'role',
+      field: 'roles',
 
       headerName: 'Роль',
+      flex: 0.5,
+      renderCell: (params) => (params.row.roles || []).join(', '),
     },
 
     {
       field: 'lastOnline',
-
+      flex: 0.35,
+      minWidth: 100,
       renderCell: (params) => dataFormat.dateTimeFormatter(params.row.lastOnline),
-
       headerName: 'Был в сети',
-    },
-
-    {
-      field: 'avatar',
-
-      sortable: false,
-      renderCell: (params) => dataFormat.imageFormatter(params.row),
-
-      headerName: 'Аватар',
     },
 
     {
@@ -166,7 +159,7 @@ const UsersTable = () => {
       headerName: 'Действия',
       sortable: false,
       flex: 0.6,
-      maxWidth: 80,
+      maxWidth: 100,
       renderCell: (params) => (
         <Actions
           classes={classes}
