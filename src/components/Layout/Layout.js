@@ -16,6 +16,7 @@ import AddApplicant from '../../pages/applicants/AddApplicant';
 import Applicants from '../../pages/applicants/Applicants';
 import ApplicantDetails from '../../pages/applicants/details/ApplicantDetails';
 import ManualEntryPage from '../../pages/applicants/details/components/ManualEntryPage';
+import AnnotationPage from '../../pages/applicants/annotation/AnnotationPage';
 import UsersFormPage from '../../pages/CRUD/Users/form/UsersFormPage';
 import UsersTable from '../../pages/CRUD/Users/table/UsersTable';
 import Dashboard from '../../pages/dashboard';
@@ -61,6 +62,7 @@ function Layout(props) {
             <Route path='/app/applicants' exact component={Applicants} />
             <Route path='/app/applicants/new' exact component={AddApplicant} />
             <Route path='/app/applicants/:id/documents/:docId/manual-entry' exact component={ManualEntryPage} />
+            <Route path='/app/applicants/:id/annotation' exact component={AnnotationPage} />
             <Route path='/app/applicants/:id' component={ApplicantDetails} />
             <Route path='/app/users' exact component={UsersTable} />
             <Route path='/app/user/new' exact component={UsersFormPage} />

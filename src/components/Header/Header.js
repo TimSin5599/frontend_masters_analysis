@@ -30,6 +30,7 @@ import {
 
 import { actions } from '../../context/ManagementContext';
 import { signOut, useUserDispatch } from '../../context/UserContext';
+import { hasRole } from '../../utils/roles';
 
 export default function Header(props) {
   let classes = useStyles();
@@ -82,7 +83,7 @@ export default function Header(props) {
         {/* Horizontal Navigation Links */}
         <div className={classes.navContainer} style={{ marginLeft: 'auto' }}>
           {structure.map((item) => {
-            if (item.label === 'Пользователи' && currentUser?.role !== 'admin') {
+            if (item.label === 'Пользователи' && !hasRole(currentUser, 'admin')) {
               return null;
             }
             if (item.children) {

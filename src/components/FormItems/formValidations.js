@@ -61,6 +61,9 @@ const formValidations = (fields, record = {}) => {
 
       case 'stringArray':
         yupConds = yup.array().compact().ensure().of(yup.string().trim());
+        if (required) {
+          yupConds = yupConds.min(1, 'Необходимо выбрать хотя бы одну роль');
+        }
         break;
 
       case 'string':
@@ -71,8 +74,8 @@ const formValidations = (fields, record = {}) => {
         yupConds = yup.string();
     }
     yupConds = yupConds.label(label);
-    if (required) {
-      yupConds = yupConds.required();
+    if (required && type !== 'stringArray') {
+      yupConds = yupConds.required('Обязательное поле');
     }
     yupArray[field] = yupConds;
   });

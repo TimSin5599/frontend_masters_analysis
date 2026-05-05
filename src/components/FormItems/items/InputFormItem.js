@@ -1,4 +1,4 @@
-import React  from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import FormErrors from 'components/FormItems/formErrors';
 import { FastField } from 'formik';
@@ -14,39 +14,44 @@ const InputFormItem = (props) => {
     autoComplete,
     inputProps,
     errorMessage,
-    multiline
+    multiline,
+    disabled,
+    type,
   } = props;
 
   const { label } = schema[name];
 
   return (
     <FastField name={name}>
-      {({ form }) => (
-        <>
-          <TextField
-            id='outlined-basic'
-            variant='outlined'
-            fullWidth
-            label={label}
-            multiline={multiline}
-            rows={multiline && 4}
-            onChange={(event) => {
-              form.setFieldValue(name, event.target.value);
-              form.setFieldTouched(name);
-            }}
-            value={form.values[name] || ''}
-            placeholder={placeholder || undefined}
-            autoFocus={autoFocus || undefined}
-            autoComplete={autoComplete || undefined}
-            // error={FormErrors.validateStatus(form, name, errorMessage)}
-            {...inputProps}
-          />
-          <div className='invalid-feedback'>
-            {FormErrors.displayableError(form, name, errorMessage)}
-          </div>
-          {!!hint && <small className='form-text text-muted'>{hint}</small>}
-        </>
-      )}
+      {({ form }) => {
+        const errorText = FormErrors.displayableError(form, name, errorMessage);
+        return (
+          <>
+            <TextField
+              id={`field-${name}`}
+              variant='outlined'
+              fullWidth
+              label={label}
+              type={type || 'text'}
+              multiline={multiline}
+              rows={multiline && 4}
+              disabled={disabled}
+              onChange={(event) => {
+                form.setFieldValue(name, event.target.value);
+                form.setFieldTouched(name);
+              }}
+              value={form.values[name] || ''}
+              placeholder={placeholder || undefined}
+              autoFocus={autoFocus || undefined}
+              autoComplete={autoComplete || undefined}
+              error={!!errorText}
+              helperText={errorText || undefined}
+              {...inputProps}
+            />
+            {!!hint && <small className='form-text text-muted'>{hint}</small>}
+          </>
+        );
+      }}
     </FastField>
   );
 };
@@ -57,6 +62,7 @@ InputFormItem.propTypes = {
   type: PropTypes.string,
   hint: PropTypes.string,
   autoFocus: PropTypes.bool,
+  disabled: PropTypes.bool,
   size: PropTypes.string,
   prefix: PropTypes.string,
   placeholder: PropTypes.string,

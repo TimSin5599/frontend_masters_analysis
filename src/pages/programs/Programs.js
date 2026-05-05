@@ -48,8 +48,9 @@ const DOCUMENT_TYPE_OPTIONS = Object.keys(DOC_TYPE_LABELS);
 
 export default function ProgramsPage({ defaultView }) {
     const { currentUser } = useUserState();
-    const isAdmin = currentUser?.role === 'admin';
-    const isManager = currentUser?.role === 'manager';
+    const userRoles = Array.isArray(currentUser?.roles) ? currentUser.roles : (currentUser?.role ? [currentUser.role] : []);
+    const isAdmin = userRoles.includes('admin');
+    const isManager = userRoles.includes('manager');
     const canManage = isAdmin || isManager;
     const currentYear = new Date().getFullYear();
 
@@ -233,8 +234,11 @@ export default function ProgramsPage({ defaultView }) {
                     const id = tableMeta.rowData[0];
                     return (
                         <Button variant="outlined" size="small"
-                            onClick={() => window.location.hash = `#/app/applicants/${id}?program_id=${currentProgram.id}`}>
-                            Анализ
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.hash = `#/app/applicants/${id}/annotation?program_id=${currentProgram.id}`;
+                            }}>
+                            Аннотация
                         </Button>
                     );
                 }
@@ -261,7 +265,7 @@ export default function ProgramsPage({ defaultView }) {
                 title="Системная и программная инженерия"
                 actions={
                     <Box display="flex" gap={1}>
-                        {view === "applicants" && currentProgram && (
+                        {view === "applicants" && currentProgram && isManager && (
                             <Button variant="outlined" color="secondary"
                                 onClick={() => window.location.hash = currentProgram
                                     ? `#/app/applicants/new?program_id=${currentProgram.id}`
@@ -354,7 +358,7 @@ export default function ProgramsPage({ defaultView }) {
                                                                 user_id: userId,
                                                                 slot_number: slotNum,
                                                                 program_id: currentProgram.id,
-                                                                role: currentUser?.role || "admin",
+                                                                role: (Array.isArray(currentUser?.roles) ? currentUser.roles : [currentUser?.role || 'admin']).join(','),
                                                             })
                                                                 .then(() => {
                                                                     setExpertSlots(prev => {
@@ -459,9 +463,9 @@ export default function ProgramsPage({ defaultView }) {
                     <Grid container spacing={4}>
                         {programs.map(program => (
                             <Grid item xs={12} md={4} key={program.id}>
-                                <Card elevation={3} style={{ borderRadius: 15 }}>
-                                    <CardActionArea onClick={() => { setCurrentProgram(program); setView("applicants"); }}>
-                                        <CardContent style={{ height: 180, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                                <Card elevation={5} style={{ borderRadius: 15, height: '100%' }}>  {/* ← height: '100%' */}
+                                    <CardActionArea onClick={() => { setCurrentProgram(program); setView("applicants"); }} sx={{ height: '100%' }}>
+                                        <CardContent style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', height: '100%' }}>  {/* ← height: '100%' */}
                                             <Box mb={1} bgcolor="primary.light" color="white" display="inline-block" p={1} borderRadius={2} alignSelf="center">
                                                 <Typography variant="h6">{program.year}</Typography>
                                             </Box>

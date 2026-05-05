@@ -15,7 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 import classnames from 'classnames';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 // styles
@@ -41,7 +41,14 @@ export default function SidebarLink({
   ...props
 }) {
   // local
-  let [isOpen, setIsOpen] = useState(false);
+  const hasActiveChild = children
+    ? children.some(c => c.link && (location.pathname === c.link || location.pathname.startsWith(c.link + '/')))
+    : false;
+  let [isOpen, setIsOpen] = useState(hasActiveChild);
+
+  useEffect(() => {
+    if (hasActiveChild) setIsOpen(true);
+  }, [hasActiveChild]);
   // Add Section Popover state
   const [anchorEl, setAnchorEl] = React.useState(null);
 

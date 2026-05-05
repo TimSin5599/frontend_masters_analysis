@@ -77,6 +77,13 @@ function KpiCard({ title, subtitle, value, icon: Icon, color }) {
   );
 }
 
+function formatMinutes(decimalMinutes) {
+  const total = Math.round(parseFloat(decimalMinutes) * 60);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m} мин ${String(s).padStart(2, '0')} сек`;
+}
+
 export default function StatsPanel({ programId = 0 }) {
   const theme = useTheme();
   const [stats, setStats] = useState(null);
@@ -373,7 +380,7 @@ export default function StatsPanel({ programId = 0 }) {
                 <TableHead>
                   <TableRow>
                     <TableCell>Дата</TableCell>
-                    <TableCell align="right">Среднее, мин</TableCell>
+                    <TableCell align="right">Среднее время</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -381,7 +388,7 @@ export default function StatsPanel({ programId = 0 }) {
                     <TableRow key={row.date}>
                       <TableCell>{row.date}</TableCell>
                       <TableCell align="right">
-                        {parseFloat(row.avg_minutes).toFixed(1)}
+                        {formatMinutes(row.avg_minutes)}
                       </TableCell>
                     </TableRow>
                   ))}
