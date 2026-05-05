@@ -18,14 +18,14 @@ const AchievementsSection = ({
 
     const currentEntry = (data.length > 0 && activeSubTab !== 'add') ? data[activeSubTab] : null;
     const isAI = currentEntry?.source === 'model';
-    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+    const canConfirm = isAI && (Array.isArray(currentUser?.roles) ? currentUser.roles.includes('expert') : currentUser?.role === 'expert') && applicantStatus === 'verifying';
 
     return (
         <Box mt={1}>
             {isAI && (
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{ 
-                    backgroundColor: '#fff9c4', 
-                    p: 2, 
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{
+                    backgroundColor: '#fff9c4',
+                    p: 2,
                     borderRadius: 2,
                     border: '1px solid #ffe082',
                 }}>
@@ -33,10 +33,10 @@ const AchievementsSection = ({
                         ✨ Данные извлечены ИИ. Пожалуйста, проверьте и подтвердите.
                     </Typography>
                     {canConfirm && (
-                        <Button 
-                            variant="contained" 
-                            color="success" 
-                            size="small" 
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
                             startIcon={<DoneIcon />}
                             onClick={handleSave}
                         >

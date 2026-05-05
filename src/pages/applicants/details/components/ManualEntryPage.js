@@ -263,10 +263,9 @@ export default function ManualEntryPage() {
         // Build user metadata for source attribution
         let userMeta = {};
         if (currentUser) {
-            let roleLabel = "оператор";
-            if (currentUser.role === "admin")   roleLabel = "админ";
-            if (currentUser.role === "manager") roleLabel = "менеджер";
-            if (currentUser.role === "expert")  roleLabel = "эксперт";
+            const roles = Array.isArray(currentUser.roles) ? currentUser.roles : (currentUser.role ? [currentUser.role] : []);
+            const roleMap = { admin: 'админ', manager: 'менеджер', expert: 'эксперт' };
+            const roleLabel = roles.map(r => roleMap[r] || r).join(', ') || 'пользователь';
             userMeta = {
                 role:       roleLabel,
                 first_name: currentUser.firstName  || "",

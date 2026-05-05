@@ -1,8 +1,9 @@
 import {
-    Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem,
-    Select, Typography, IconButton, Chip, Tooltip
+    Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent,
+    DialogTitle, FormControl, InputLabel, MenuItem, Select, Typography,
+    IconButton, Chip, Tooltip
 } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -11,6 +12,9 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import ReplayIcon from '@mui/icons-material/Replay';
 import EditNoteIcon from '@mui/icons-material/EditNote';
+import EditIcon from '@mui/icons-material/Edit';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -33,19 +37,20 @@ const STATUS_META = {
 };
 
 const CATEGORY_LABELS = {
-    passport:         'Паспорт',
-    resume:           'Резюме',
-    diploma:          'Диплом',
-    work:             'Трудовая деятельность',
-    transcript:       'Приложение к диплому',
-    second_diploma:   'Второй диплом',
-    certification:    'Сертификация',
-    achievement:      'Достижение',
-    recommendation:   'Рекомендация',
-    motivation:       'Мотивация',
-    language:         'Сертификат АЯ',
-    prof_development: 'Проф. развитие',
-    unknown:          'Нераспознано',
+    passport:             'Паспорт',
+    resume:               'Резюме',
+    diploma:              'Диплом',
+    work:                 'Трудовая деятельность',
+    transcript:           'Приложение к диплому',
+    second_diploma:       'Второй диплом',
+    certification:        'Сертификация',
+    achievement:          'Достижение',
+    recommendation:       'Рекомендация',
+    motivation:           'Мотивация',
+    language:             'Сертификат АЯ',
+    prof_development:     'Проф. развитие',
+    unknown:              'Нераспознано',
+    video_presentation:   'Видео-презентация (ссылка)',
 };
 
 const CATEGORY_OPTIONS = [
@@ -138,10 +143,17 @@ export default function DocumentsSection({
     setActiveDocumentId,
     getDocumentUrl,
     onManualEntry,
+    missingDocTypes = [],
+    onUpload,
+    onNavigateToVideo,
+    canUpload = false,
 }) {
     const [selectedCategories, setSelectedCategories] = useState({});
     const [editingDocs, setEditingDocs] = useState({});
     const [previewDocId, setPreviewDocId] = useState(null);
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    const [uploadCategory, setUploadCategory] = useState('');
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         const initial = {};
@@ -150,10 +162,19 @@ export default function DocumentsSection({
     }, [documents]);
 
     useEffect(() => {
-        (documents || []).forEach(doc => {
-            if (doc.status === 'classification_failed') {
-                setEditingDocs(prev => prev[doc.id] ? prev : { ...prev, [doc.id]: true });
-            }
+        setEditingDocs(prev => {
+            let changed = false;
+            const next = { ...prev };
+            (documents || []).forEach(doc => {
+                if (doc.status === 'classification_failed') {
+                    if (!next[doc.id]) { next[doc.id] = true; changed = true; }
+                } else if (next[doc.id] && IN_FLIGHT.has(doc.status)) {
+                    // Doc left error state (reprocessed) — exit editing mode
+                    delete next[doc.id];
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
         });
     }, [documents]);
 
@@ -172,15 +193,21 @@ export default function DocumentsSection({
         setActiveDocumentId(docId);
     };
 
-    const allDocs = documents || [];
+    const openUploadDialog = (preselectedCategory = '') => {
+        setUploadCategory(preselectedCategory);
+        setUploadDialogOpen(true);
+    };
 
-    if (allDocs.length === 0) {
-        return (
-            <Box p={3} textAlign="center" width="100%">
-                <Typography variant="body1" color="textSecondary">Документы еще не загружены.</Typography>
-            </Box>
-        );
-    }
+    const handleFileSelected = (e) => {
+        const file = e.target.files[0];
+        if (file && onUpload) {
+            onUpload(file, uploadCategory);
+        }
+        e.target.value = '';
+        setUploadDialogOpen(false);
+    };
+
+    const allDocs = documents || [];
 
     const renderDocCard = (doc) => {
         const isInFlight             = IN_FLIGHT.has(doc.status);
@@ -256,8 +283,8 @@ export default function DocumentsSection({
                             </Typography>
                         </Box>
 
-                        {/* Category chip or select */}
-                        <Box sx={{ flexShrink: 0, width: 200 }}>
+                        {/* Category chip/label + inline edit icon, or select when editing */}
+                        <Box sx={{ flexShrink: 0, width: 220, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             {isEditing ? (
                                 <FormControl size="small" fullWidth disabled={isInFlight}>
                                     <InputLabel>Категория</InputLabel>
@@ -273,9 +300,39 @@ export default function DocumentsSection({
                                     </Select>
                                 </FormControl>
                             ) : (
-                                <Box display="flex" justifyContent="center">
-                                    <StatusChip doc={doc} />
-                                </Box>
+                                <>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography
+                                            variant="caption"
+                                            color="textSecondary"
+                                            sx={{ display: 'block', lineHeight: 1.2, mb: 0.25 }}
+                                        >
+                                            Категория
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            fontWeight={600}
+                                            noWrap
+                                            sx={{ color: isInFlight ? '#f57f17' : 'text.primary' }}
+                                        >
+                                            {isInFlight
+                                                ? (STATUS_META[doc.status]?.label || 'Анализ...')
+                                                : (CATEGORY_LABELS[doc.file_type] || doc.file_type || '—')}
+                                        </Typography>
+                                    </Box>
+                                    <Tooltip title="Изменить категорию">
+                                        <span>
+                                            <IconButton
+                                                size="small"
+                                                disabled={isInFlight}
+                                                onClick={() => startEditing(doc.id)}
+                                                sx={{ flexShrink: 0, p: '4px' }}
+                                            >
+                                                <EditIcon sx={{ fontSize: 15 }} />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                </>
                             )}
                         </Box>
 
@@ -295,8 +352,8 @@ export default function DocumentsSection({
                             </Tooltip>
                         )}
 
-                        {/* Action buttons */}
-                        {isEditing ? (
+                        {/* Confirm / cancel when editing */}
+                        {isEditing && (
                             <>
                                 <Tooltip title="Сохранить и запустить извлечение">
                                     <span>
@@ -317,16 +374,6 @@ export default function DocumentsSection({
                                     </IconButton>
                                 </Tooltip>
                             </>
-                        ) : (
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                disabled={isInFlight}
-                                onClick={() => startEditing(doc.id)}
-                                sx={{ flexShrink: 0, width: 100, whiteSpace: 'nowrap' }}
-                            >
-                                Изменить
-                            </Button>
                         )}
 
                         {/* Reprocess */}
@@ -355,82 +402,203 @@ export default function DocumentsSection({
     };
 
     return (
-        <Box display="flex" width="100%" height="100%" overflow="hidden" sx={{ minHeight: 0 }}>
+        <>
+            {/* Hidden file input for upload */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                onChange={handleFileSelected}
+            />
 
-            {/* Left: PDF preview */}
-            <Box sx={{
-                width: '45%',
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                borderRight: '1px solid',
-                borderColor: 'divider',
-                minHeight: 0,
-            }}>
-                <Box px={2} py={1.5} bgcolor="primary.main" color="white" sx={{ flexShrink: 0 }}>
-                    <Typography variant="h6" fontSize={15}>Просмотр документа</Typography>
-                </Box>
-                {previewDocId && getDocumentUrl ? (
-                    <iframe
-                        key={previewDocId}
-                        src={getDocumentUrl(previewDocId)}
-                        style={{ border: 'none', flexGrow: 1, width: '100%', display: 'block' }}
-                        title="Document Preview"
-                    />
-                ) : (
-                    <Box display="flex" alignItems="center" justifyContent="center" flexGrow={1}>
-                        <Typography variant="body2" color="textSecondary">
-                            Выберите документ из списка для просмотра
+            {/* Upload dialog */}
+            <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Загрузить документ</DialogTitle>
+                <DialogContent>
+                    {uploadCategory ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Категория: <strong>{CATEGORY_LABELS[uploadCategory] || uploadCategory}</strong>
                         </Typography>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Категория будет определена ИИ автоматически. В случае ошибки классификации вы сможете выбрать категорию вручную.
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setUploadDialogOpen(false)}>Отмена</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        Выбрать файл
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Box display="flex" width="100%" height="100%" overflow="hidden" sx={{ minHeight: 0 }}>
+
+                {/* Left: PDF preview */}
+                <Box sx={{
+                    width: '45%',
+                    flexShrink: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    borderRight: '1px solid',
+                    borderColor: 'divider',
+                    minHeight: 0,
+                }}>
+                    <Box px={2} py={1.5} bgcolor="primary.main" color="white" sx={{ flexShrink: 0 }}>
+                        <Typography variant="h6" fontSize={15}>Просмотр документа</Typography>
                     </Box>
-                )}
-            </Box>
+                    {previewDocId && getDocumentUrl ? (
+                        <iframe
+                            key={previewDocId}
+                            src={getDocumentUrl(previewDocId)}
+                            style={{ border: 'none', flexGrow: 1, width: '100%', display: 'block' }}
+                            title="Document Preview"
+                        />
+                    ) : (
+                        <Box display="flex" alignItems="center" justifyContent="center" flexGrow={1}>
+                            <Typography variant="body2" color="textSecondary">
+                                Выберите документ из списка для просмотра
+                            </Typography>
+                        </Box>
+                    )}
+                </Box>
 
-            {/* Right: document sections */}
-            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {SECTIONS.map(section => {
-                        const sectionDocs = allDocs.filter(d => section.statuses.has(d.status));
-                        if (sectionDocs.length === 0) return null;
+                {/* Right: document sections */}
+                <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                    {/* Upload button */}
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                        <Typography variant="subtitle2" fontWeight="bold">Файлы загруженных документов</Typography>
+                        {canUpload && (
+                            <Button
+                                variant="contained"
+                                startIcon={<UploadFileIcon />}
+                                onClick={() => openUploadDialog('')}
+                                size="small"
+                            >
+                                Загрузить документ
+                            </Button>
+                        )}
+                    </Box>
 
-                        return (
-                            <Box key={section.key}>
-                                {/* Section header */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {/* Missing documents section */}
+                        {missingDocTypes.length > 0 && (
+                            <Box>
                                 <Box
                                     display="flex"
                                     alignItems="center"
                                     gap={1.5}
                                     mb={1.5}
                                     pl={1.5}
-                                    sx={{
-                                        borderLeft: `4px solid ${section.color}`,
-                                    }}
+                                    sx={{ borderLeft: '4px solid #d32f2f' }}
                                 >
-                                    <Typography variant="subtitle1" fontWeight={700} color={section.color}>
-                                        {section.label}
+                                    <WarningAmberIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
+                                    <Typography variant="subtitle1" fontWeight={700} color="#d32f2f">
+                                        Отсутствующие документы
                                     </Typography>
                                     <Chip
-                                        label={sectionDocs.length}
+                                        label={missingDocTypes.length}
                                         size="small"
-                                        sx={{
-                                            bgcolor: section.color,
-                                            color: '#fff',
-                                            fontWeight: 700,
-                                            height: 20,
-                                            '& .MuiChip-label': { px: 1 },
-                                        }}
+                                        sx={{ bgcolor: '#d32f2f', color: '#fff', fontWeight: 700, height: 20, '& .MuiChip-label': { px: 1 } }}
                                     />
                                 </Box>
-
-                                {/* Cards */}
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                    {sectionDocs.map(renderDocCard)}
+                                    {missingDocTypes.map(docType => {
+                                        const isVideo = docType === 'video_presentation';
+                                        return (
+                                            <Card
+                                                key={docType}
+                                                variant="outlined"
+                                                sx={{ borderColor: 'error.main', bgcolor: 'rgba(211,47,47,0.04)' }}
+                                            >
+                                                <CardContent sx={{ pb: '12px !important', pt: '12px !important' }}>
+                                                    <Box display="flex" alignItems="center" gap={1.5}>
+                                                        <WarningAmberIcon color="error" sx={{ flexShrink: 0 }} />
+                                                        <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>
+                                                            {CATEGORY_LABELS[docType] || docType}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="error" sx={{ flexShrink: 0 }}>
+                                                            {isVideo ? 'Ссылка не добавлена' : 'Не загружен'}
+                                                        </Typography>
+                                                        {isVideo ? (
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="error"
+                                                                size="small"
+                                                                sx={{ flexShrink: 0 }}
+                                                                onClick={onNavigateToVideo}
+                                                            >
+                                                                Добавить ссылку
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="error"
+                                                                size="small"
+                                                                startIcon={<UploadFileIcon />}
+                                                                sx={{ flexShrink: 0 }}
+                                                                onClick={() => openUploadDialog(docType)}
+                                                            >
+                                                                Загрузить
+                                                            </Button>
+                                                        )}
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </Box>
                             </Box>
-                        );
-                    })}
+                        )}
+
+                        {/* Existing status sections */}
+                        {allDocs.length === 0 && missingDocTypes.length === 0 && (
+                            <Box p={3} textAlign="center">
+                                <Typography variant="body1" color="textSecondary">Документы еще не загружены.</Typography>
+                            </Box>
+                        )}
+                        {SECTIONS.map(section => {
+                            const sectionDocs = allDocs.filter(d => section.statuses.has(d.status));
+                            if (sectionDocs.length === 0) return null;
+
+                            return (
+                                <Box key={section.key}>
+                                    <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={1.5}
+                                        mb={1.5}
+                                        pl={1.5}
+                                        sx={{ borderLeft: `4px solid ${section.color}` }}
+                                    >
+                                        <Typography variant="subtitle1" fontWeight={700} color={section.color}>
+                                            {section.label}
+                                        </Typography>
+                                        <Chip
+                                            label={sectionDocs.length}
+                                            size="small"
+                                            sx={{
+                                                bgcolor: section.color,
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                height: 20,
+                                                '& .MuiChip-label': { px: 1 },
+                                            }}
+                                        />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                        {sectionDocs.map(renderDocCard)}
+                                    </Box>
+                                </Box>
+                            );
+                        })}
+                    </Box>
                 </Box>
             </Box>
-        </Box>
+        </>
     );
 }

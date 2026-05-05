@@ -21,7 +21,7 @@ const EducationSection = ({
     const transcriptDoc = safeDocs.find(d => d.file_type === 'transcript');
 
     const isAI = data.source === 'model';
-    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+    const canConfirm = isAI && (Array.isArray(currentUser?.roles) ? currentUser.roles.includes('expert') : currentUser?.role === 'expert') && applicantStatus === 'verifying';
 
     return (
         <Box mt={1} sx={{

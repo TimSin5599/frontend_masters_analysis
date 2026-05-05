@@ -16,12 +16,12 @@ const LanguageSection = ({
     if (data === null || data === undefined) return null;
 
     const isAI = data.source === 'model';
-    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+    const canConfirm = isAI && (Array.isArray(currentUser?.roles) ? currentUser.roles.includes('expert') : currentUser?.role === 'expert') && applicantStatus === 'verifying';
 
     return (
-        <Box mt={4} sx={{ 
-            backgroundColor: isAI ? '#fff9c4' : 'transparent', 
-            p: isAI ? 2 : 0, 
+        <Box mt={4} sx={{
+            backgroundColor: isAI ? '#fff9c4' : 'transparent',
+            p: isAI ? 2 : 0,
             borderRadius: 2,
             border: isAI ? '1px solid #ffe082' : 'none',
             transition: 'all 0.3s ease'
@@ -32,10 +32,10 @@ const LanguageSection = ({
                         ✨ Данные сертификата извлечены ИИ. Пожалуйста, проверьте и подтвердите.
                     </Typography>
                     {canConfirm && (
-                        <Button 
-                            variant="contained" 
-                            color="success" 
-                            size="small" 
+                        <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
                             startIcon={<DoneIcon />}
                             onClick={handleSave}
                         >

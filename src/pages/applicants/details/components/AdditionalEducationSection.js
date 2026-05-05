@@ -19,25 +19,25 @@ const AdditionalEducationSection = ({
 
     const currentEntry = (Array.isArray(data) && data.length > 0 && activeSubTab !== 'add') ? data[activeSubTab] : null;
     const isAI = currentEntry?.source === 'model';
-    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+    const canConfirm = isAI && (Array.isArray(currentUser?.roles) ? currentUser.roles.includes('expert') : currentUser?.role === 'expert') && applicantStatus === 'verifying';
 
     const renderAIHeader = () => {
         if (!isAI) return null;
         return (
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{ 
-                backgroundColor: '#fff9c4', 
-                p: 2, 
-                borderRadius: 2, 
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{
+                backgroundColor: '#fff9c4',
+                p: 2,
+                borderRadius: 2,
                 border: '1px solid #ffe082',
             }}>
                 <Typography variant="subtitle2" color="warning.dark" sx={{ fontWeight: 'bold' }}>
                     ✨ Данные извлечены ИИ. Пожалуйста, проверьте и подтвердите.
                 </Typography>
                 {canConfirm && (
-                    <Button 
-                        variant="contained" 
-                        color="success" 
-                        size="small" 
+                    <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
                         startIcon={<DoneIcon />}
                         onClick={handleSave}
                     >
@@ -119,7 +119,7 @@ const AdditionalEducationSection = ({
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField disabled={!isEditing} label="Дата начала" fullWidth variant="outlined" size="small"
-                                    value={formatDateForDisplay(data[activeSubTab].start_date)} 
+                                    value={formatDateForDisplay(data[activeSubTab].start_date)}
                                     onChange={e => {
                                         const newData = [...data];
                                         newData[activeSubTab].start_date = e.target.value;
@@ -128,10 +128,19 @@ const AdditionalEducationSection = ({
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField disabled={!isEditing} label="Дата окончания" fullWidth variant="outlined" size="small"
-                                    value={formatDateForDisplay(data[activeSubTab].end_date)} 
+                                    value={formatDateForDisplay(data[activeSubTab].end_date)}
                                     onChange={e => {
                                         const newData = [...data];
                                         newData[activeSubTab].end_date = e.target.value;
+                                        setData(newData);
+                                    }} />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField disabled={!isEditing} label="Компетенции / Ключевые навыки" fullWidth multiline rows={2} variant="outlined" size="small"
+                                    value={data[activeSubTab].competencies || ""}
+                                    onChange={e => {
+                                        const newData = [...data];
+                                        newData[activeSubTab].competencies = e.target.value;
                                         setData(newData);
                                     }} />
                             </Grid>
@@ -142,7 +151,7 @@ const AdditionalEducationSection = ({
         );
     }
 
-    // --- SECOND DIPLOMA ---
+    // --- ADDITIONAL DIPLOMA ---
     if (activeCategory === "second_diploma") {
         if (!Array.isArray(data)) return null;
         return (
@@ -151,7 +160,7 @@ const AdditionalEducationSection = ({
                 {data.length > 0 && activeSubTab !== 'add' && data[activeSubTab] && (
                     <Paper variant="outlined" style={{ padding: 10, marginBottom: 10 }}>
                         <Box display="flex" justifyContent="space-between" mb={1}>
-                            <Typography variant="subtitle2" color="primary">Второй диплом #{activeSubTab + 1}</Typography>
+                            <Typography variant="subtitle2" color="primary">Дополнительный диплом #{activeSubTab + 1}</Typography>
                             <div>
                                 {data[activeSubTab].document_id && (
                                     <>

@@ -19,7 +19,7 @@ const PersonalDataSection = ({
     const safeDocs = documents || [];
 
     const isAI = data.source === 'model';
-    const canConfirm = isAI && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && applicantStatus === 'verifying';
+    const canConfirm = isAI && (Array.isArray(currentUser?.roles) ? currentUser.roles.includes('expert') : currentUser?.role === 'expert') && applicantStatus === 'verifying';
 
     const passportDoc = safeDocs.find(d => d.file_type === 'passport');
     const resumeDoc = safeDocs.find(d => d.file_type === 'resume');
