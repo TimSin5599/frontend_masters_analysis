@@ -32,3 +32,6 @@ Thumbs.db
 
 # Graph knowledge base
 graphify-out/
+
+frontend/localhost-key.pem
+frontend/localhost.pem

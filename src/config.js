@@ -1,10 +1,7 @@
-const isDev = process.env.NODE_ENV === "development";
-const host = window.location.hostname || "localhost";
-
-// В разработке (локально) ходим напрямую на порты, в продакшене — через NGINX
-const baseURLApi = isDev ? `http://${host}:8101` : `/api/auth`;
-const manageApi = isDev ? `http://${host}:8102` : `/api/manage`;
-const statsApi = isDev ? `http://${host}:8103` : `/api/stats`;
+// Всегда используем относительные пути — в dev через setupProxy.js, в prod через nginx
+const baseURLApi = `/api/auth`;
+const manageApi = `/api/manage`;
+const statsApi = `/api/stats`;
 
 export default {
   baseURLApi,

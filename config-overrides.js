@@ -29,3 +29,31 @@ module.exports = function override(config) {
   });
   return config;
 };
+
+module.exports.devServer = function (configFunction) {
+  return function (proxy, allowedHost) {
+    const config = configFunction(proxy, allowedHost);
+    config.proxy = [
+      {
+        context: ['/api/auth'],
+        target: 'http://localhost:8101',
+        changeOrigin: true,
+        pathRewrite: { '^/api/auth': '' },
+      },
+      {
+        context: ['/api/manage'],
+        target: 'http://localhost:8102',
+        changeOrigin: true,
+        pathRewrite: { '^/api/manage': '' },
+        ws: true,
+      },
+      {
+        context: ['/api/stats'],
+        target: 'http://localhost:8103',
+        changeOrigin: true,
+        pathRewrite: { '^/api/stats': '' },
+      },
+    ];
+    return config;
+  };
+};
